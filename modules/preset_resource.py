@@ -195,7 +195,7 @@ def is_comfy_preset_file(preset_file_path: Path) -> bool:
     Uses fast directory name matching, falling back to JSON parsing only for mixed folders.
     """
     # 1. Fast Directory Check: If inside a known Comfy category, classify immediately
-    comfy_folders = {'Flux1Dev', 'Flux1Krea', 'Flux1Schnell', 'HyperFlux1D', 'LowVRAM_Plus', 'SD3x', 'Z-Image Base', 'Z-Image Turbo', 'SD1.5'}
+    comfy_folders = {'Flux1Dev', 'Flux1Krea', 'Flux1Schnell', 'HyperFlux1D', 'Krea2', 'LowVRAM_Plus', 'SD3x', 'Z-Image Base', 'Z-Image Turbo', 'SD1.5'}
     if preset_file_path.parent.name in comfy_folders:
         return True
 
@@ -556,6 +556,50 @@ def preset_favorite_value():
         return 'Add Current Preset to Favorites'
 
 
+def evaluate_sd15_auto_upscale(preset_name: str, preset_content: dict):
+    """
+    Automatically enable Auto-Upscale for SD1.5 presets,
+    restores the prior state when leaving SD1.5,
+    and protect the cache when switching between
+    multiple SD1.5 presets.
+    """
+    if not getattr(config, 'default_sd1_5_upscale', True):
+        return gr.update()
+
+    # Detect if the target preset belongs
+    # to the SD1.5 architecture
+    is_new_sd15 = False
+    preset_lower = preset_name.lower()
+    if 'sd1.5' in preset_lower or 'sd15' in preset_lower:
+        is_new_sd15 = True
+    elif preset_content.get('default_engine', {}).get('backend_engine') == 'SD1':
+        is_new_sd15 = True
+    elif any(k in str(preset_content.get('default_model', '')).lower() for k in ['sd1.5', 'sd15']):
+        is_new_sd15 = True
+
+    # Transition 1: Entering SD1.5 from non-SD1.5
+    if not common.was_sd15_preset and is_new_sd15:
+        common.saved_auto_upscale_before_sd15 = common.comfy_auto_upscale
+        common.comfy_auto_upscale = True
+        common.was_sd15_preset = True
+        interpret('[Preset] SD1.5 preset active: Auto-Upscale enabled')
+        return gr.update(value=True)
+
+    # Transition 2: Leaving SD1.5 back to non-SD1.5
+    elif common.was_sd15_preset and not is_new_sd15:
+        restored_val = common.saved_auto_upscale_before_sd15 if common.saved_auto_upscale_before_sd15 is not None else False
+        common.comfy_auto_upscale = restored_val
+        common.saved_auto_upscale_before_sd15 = None
+        common.was_sd15_preset = False
+        interpret('[Preset] Restored previous Auto-Upscale state:', str(restored_val))
+        return gr.update(value=restored_val)
+
+    # Transition 3: Staying in the same family
+    # (SD1.5 -> SD1.5 or Non-SD1.5 -> Non-SD1.5)
+    common.was_sd15_preset = is_new_sd15
+    return gr.update()
+
+
 def set_preset_selection(arg_preset_selection, state_params):
     # called by webui preset_selection.change()
     global category_selection, current_preset, \
@@ -700,6 +744,8 @@ def set_preset_selection(arg_preset_selection, state_params):
 
     # ------------------------------------------------
 
+    upscale_checkbox_update = evaluate_sd15_auto_upscale(current_preset, preset_content)
+
     return (gr.update(value=current_preset),
         gr.update(value=state_params),
         gr.update(value=current_preset),
@@ -720,7 +766,9 @@ def set_preset_selection(arg_preset_selection, state_params):
         gr.update(visible=lora_warning),
         gr.update(value=cfg_value, minimum=cfg_min,
             maximum=cfg_max, step=cfg_step),
-        gr.update(value=common.vae_sharpness))
+        gr.update(value=common.vae_sharpness),
+        upscale_checkbox_update)
+
 
 def bar_button_change(bar_button, state_params):
     global category_selection, current_preset

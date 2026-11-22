@@ -9,12 +9,17 @@ import modules.user_structure as US
 from args_manager import args
 from enhanced.translator import interpret
 from modules.ar_util import AR_split
-from modules.flags import scheduler_list, sampler_list
+from modules.flags import scheduler_list, \
+ sampler_list, comfy_scheduler_list, comfy_sampler_list
 
 
 def verify_sampler(arg_sampler):
+    valid_samplers = set(sampler_list)
+    if common.comfy_active or common.default_engine or getattr(config, 'default_comfy_sdxl_checkbox', False):
+        valid_samplers.update(comfy_sampler_list)
+
     # arg_sampler is valid
-    if arg_sampler in sampler_list:
+    if arg_sampler in valid_samplers:
         config.default_sampler = arg_sampler
         return config.default_sampler
 
@@ -34,8 +39,12 @@ def verify_sampler(arg_sampler):
 
 
 def verify_scheduler(arg_scheduler):
+    valid_schedulers = set(scheduler_list)
+    if common.comfy_active or common.default_engine or getattr(config, 'default_comfy_sdxl_checkbox', False):
+        valid_schedulers.update(comfy_scheduler_list)
+
     # arg_scheduler is valid
-    if arg_scheduler in scheduler_list:
+    if arg_scheduler in valid_schedulers:
         config.default_scheduler = arg_scheduler
         return config.default_scheduler
 

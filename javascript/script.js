@@ -280,43 +280,51 @@ async function generateBatch(batch_count, grid_enabled)
 
 
 function initStylePreviewOverlay() {
-    let overlayVisible = false;
-    const samplesPath = document.querySelector("meta[name='samples-path']").getAttribute("content")
-    const overlay = document.createElement('div');
-    const tooltip = document.createElement('div');
-    tooltip.className = 'preview-tooltip';
-    overlay.appendChild(tooltip);
-    overlay.id = 'stylePreviewOverlay';
-    document.body.appendChild(overlay);
-    document.addEventListener('mouseover', function (e) {
-        const label = e.target.closest('.style_selections label');
-        if (!label) return;
-        label.removeEventListener("mouseout", onMouseLeave);
-        label.addEventListener("mouseout", onMouseLeave);
-        overlayVisible = true;
-        overlay.style.opacity = "1";
-        const originalText = label.querySelector("span").getAttribute("data-original-text");
-        const name = originalText || label.querySelector("span").textContent;
-        overlay.style.backgroundImage = `url("${samplesPath.replace(
-            "fooocus_v2",
-            name.toLowerCase().replaceAll(" ", "_")
-        ).replaceAll("\\", "\\\\")}")`;
+    // Keep previews inside their labels; never use cached translated label text.
+    if (initStylePreviewOverlay.initialized) return;
+    const meta = document.querySelector("meta[name='samples-path']");
+    if (!meta) return;
+    initStylePreviewOverlay.initialized = true;
+    const samplesPath = meta.getAttribute('content');
 
-        tooltip.textContent = label.querySelector("span").textContent || name;
+    function refreshStyleThumbnails() {
+        gradioApp().querySelectorAll('.style_selections label').forEach(label => {
+            const input = label.querySelector('input[type="checkbox"]');
+            const span = label.querySelector('span');
+            if (!input || !span) return;
+            // Gradio's checkbox value is the untranslated style identity.
+            // Older builds without a value fall back to the CURRENT visible name.
+            let name = input.value && input.value !== 'on' ? input.value : span.textContent.trim();
+            if ((!input.value || input.value === 'on') && typeof localization !== 'undefined') {
+                name = Object.keys(localization).find(key => localization[key] === name) || name;
+            }
+            const filename = name.toLowerCase().replaceAll(' ', '_');
+            const src = samplesPath.replace('fooocus_v2', filename);
+            let img = label.querySelector('img.style-thumbnail');
+            if (!img) {
+                img = document.createElement('img');
+                img.className = 'style-thumbnail';
+                img.alt = ''; // The adjacent style name supplies the accessible label.
+                img.loading = 'lazy';
+                img.decoding = 'async';
+                img.width = 80;
+                img.height = 80;
+                img.addEventListener('error', () => {
+                    img.classList.add('style-thumbnail-missing');
+                });
+                label.insertBefore(img, span);
+            }
+            if (img.dataset.styleName !== name) {
+                img.dataset.styleName = name;
+                img.classList.remove('style-thumbnail-missing');
+                img.src = src;
+            }
+        });
+    }
 
-        function onMouseLeave() {
-            overlayVisible = false;
-            overlay.style.opacity = "0";
-            overlay.style.backgroundImage = "";
-            label.removeEventListener("mouseout", onMouseLeave);
-        }
-    });
-    document.addEventListener('mousemove', function (e) {
-        if (!overlayVisible) return;
-        overlay.style.left = `${e.clientX}px`;
-        overlay.style.top = `${e.clientY}px`;
-        overlay.className = e.clientY > window.innerHeight / 2 ? "lower-half" : "upper-half";
-    });
+    refreshStyleThumbnails();
+    // Gradio can reuse labels when sorting, searching, or changing presets.
+    onAfterUiUpdate(refreshStyleThumbnails);
 }
 
 /**
@@ -352,3 +360,173 @@ function htmlDecode(input) {
   var doc = new DOMParser().parseFromString(input, "text/html");
   return doc.documentElement.textContent;
 }
+
+
+// Hide cards without removing Gradio's managed checkbox nodes or style definitions.
+// Persists hidden styles to the backend user directory via #hidden_styles_sync.
+(function () {
+    let hidden = new Set();
+    let rendering = false;
+    let lastPanelSignature = null;
+    let lastGrid = null;
+    let initialSyncComplete = false;
+    const known = new Map();
+
+    function persist() {
+        const syncElem = gradioApp().querySelector('#hidden_styles_sync textarea');
+        if (syncElem) {
+            const jsonValue = JSON.stringify([...hidden].sort());
+            if (syncElem.value !== jsonValue) {
+                syncElem.value = jsonValue;
+                syncElem.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+        }
+    }
+
+    function checkBackendSync() {
+        const syncElem = gradioApp().querySelector('#hidden_styles_sync textarea');
+        if (syncElem && syncElem.value) {
+            try {
+                const loaded = JSON.parse(syncElem.value);
+                if (Array.isArray(loaded)) {
+                    hidden = new Set(loaded);
+                    initialSyncComplete = true;
+                }
+            } catch (e) {
+                console.warn('Could not parse backend hidden styles:', e);
+            }
+        }
+    }
+
+    function updateHiddenTabVisibility() {
+        const tabButtons = gradioApp().querySelectorAll('.tab-nav > button');
+        let hiddenTabButton = null;
+        let stylesTabButton = null;
+
+        tabButtons.forEach(btn => {
+            const text = btn.textContent.trim();
+            if (text === 'Hidden') {
+                hiddenTabButton = btn;
+            } else if (text === 'Styles') {
+                stylesTabButton = btn;
+            }
+        });
+
+        if (hiddenTabButton) {
+            if (hidden.size === 0) {
+                // If the user restored the last item while looking at the Hidden tab, switch back to Styles
+                if (hiddenTabButton.classList.contains('selected') && stylesTabButton) {
+                    stylesTabButton.click();
+                }
+                hiddenTabButton.style.display = 'none';
+            } else {
+                hiddenTabButton.style.display = '';
+            }
+        }
+    }
+
+    function refreshHiddenStyles() {
+        if (rendering) return;
+        rendering = true;
+        try {
+            if (!initialSyncComplete) {
+                checkBackendSync();
+            }
+
+            const app = gradioApp();
+            app.querySelectorAll('.style_selections label').forEach(label => {
+                const input = label.querySelector('input[type="checkbox"]');
+                const span = label.querySelector('span');
+                if (!input || !span) return;
+                let name = input.value && input.value !== 'on' ? input.value : span.textContent.trim();
+                if ((!input.value || input.value === 'on') && typeof localization !== 'undefined') {
+                    name = Object.keys(localization).find(key => localization[key] === name) || name;
+                }
+                const img = label.querySelector('img.style-thumbnail');
+                known.set(name, {text: span.textContent.trim(), src: img ? img.getAttribute('src') : ''});
+                let button = label.querySelector('.style-hide-button');
+                if (!button) {
+                    button = document.createElement('button');
+                    button.type = 'button';
+                    button.className = 'style-hide-button';
+                    button.textContent = '×';
+                    // Prevent a button click from toggling its enclosing checkbox label.
+                    button.addEventListener('click', event => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        const currentName = button.dataset.styleName;
+                        if (input.checked) input.click();
+                        hidden.add(currentName);
+                        persist();
+                        refreshHiddenStyles();
+                    });
+                    label.appendChild(button);
+                }
+                button.dataset.styleName = name;
+                const title = 'Hide ' + span.textContent.trim();
+                if (button.title !== title) {
+                    button.title = title;
+                    button.setAttribute('aria-label', title);
+                }
+                const isHidden = hidden.has(name);
+                if (label.classList.contains('style-card-hidden') !== isHidden) {
+                    label.classList.toggle('style-card-hidden', isHidden);
+                }
+                // Presets/model changes may select a hidden style: keep it inactive.
+                if (isHidden && input.checked) input.click();
+            });
+
+            // Update tab header visibility according to hidden count
+            updateHiddenTabVisibility();
+
+            const grid = app.querySelector('#hidden-styles-grid');
+            const status = app.querySelector('#hidden-styles-status');
+            if (!grid || !status) return;
+
+            const names = [...hidden].sort((a, b) => a.localeCompare(b));
+            const signature = JSON.stringify(names.map(name => [name, known.get(name)]));
+            if (grid === lastGrid && signature === lastPanelSignature) return;
+            lastGrid = grid;
+            lastPanelSignature = signature;
+
+            status.textContent = names.length ? 'Hidden Style Count: ' + names.length : 'No hidden styles. Use × on a style card to hide it.';
+
+            const cards = document.createDocumentFragment();
+            names.forEach(name => {
+                const info = known.get(name) || {text: name, src: ''};
+                const card = document.createElement('div');
+                card.className = 'hidden-style-card';
+                if (info.src) {
+                    const img = document.createElement('img');
+                    img.src = info.src;
+                    img.alt = '';
+                    img.loading = 'lazy';
+                    img.addEventListener('error', () => { img.style.visibility = 'hidden'; });
+                    card.appendChild(img);
+                }
+                const text = document.createElement('span');
+                text.textContent = info.text;
+                card.appendChild(text);
+                const restore = document.createElement('button');
+                restore.type = 'button';
+                restore.textContent = 'Restore';
+                restore.setAttribute('aria-label', 'Restore ' + info.text);
+                restore.addEventListener('click', () => {
+                    hidden.delete(name);
+                    persist();
+                    refreshHiddenStyles();
+                    const next = grid.querySelector('button');
+                    if (next) next.focus();
+                });
+                card.appendChild(restore);
+                cards.appendChild(card);
+            });
+            grid.replaceChildren(cards);
+        } finally {
+            rendering = false;
+        }
+    }
+
+    onUiLoaded(refreshHiddenStyles);
+    onAfterUiUpdate(refreshHiddenStyles);
+})();

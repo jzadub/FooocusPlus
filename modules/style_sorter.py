@@ -1,7 +1,10 @@
 import gradio as gr
-import modules.localization as localization
 import json
 from pathlib import Path
+
+import modules.localization as localization
+from args_manager import args as cli_args
+from enhanced.translator import interpret
 
 all_styles = []
 SORT_FILE = Path('sorted_styles.json')
@@ -9,7 +12,8 @@ V2_STYLE = "Fooocus V2"
 
 
 def _anchor_v2(styles_list):
-    """Internal helper to ensure Fooocus V2 is always at index 0."""
+    # Internal helper to ensure Fooocus V2
+    # is always at index 0
     if V2_STYLE in styles_list:
         styles_list.remove(V2_STYLE)
         return [V2_STYLE] + styles_list
@@ -33,7 +37,7 @@ def try_load_sorted_styles(style_names, default_selected):
 
                 all_styles = sorted_styles
     except Exception as e:
-        print(f'Load style sorting failed: {e}')
+        interpret('[Sorter] Load style sorting failed:',  e)
 
     # Move defaults to top, but then force V2 to the absolute top
     unselected = [y for y in all_styles if y not in default_selected]
@@ -54,7 +58,7 @@ def sort_styles(selected):
         with SORT_FILE.open('w', encoding='utf-8') as fp:
             json.dump(sorted_styles, fp, indent=4)
     except Exception as e:
-        print(f'Write style sorting failed: {e}')
+        interpret('[Sorter] Failed to save style sort:', e)
 
     all_styles = sorted_styles
     return gr.CheckboxGroup.update(choices=sorted_styles)
@@ -70,3 +74,38 @@ def search_styles(selected, query):
     unmatched = [y for y in unselected if y not in matched]
     sorted_styles = matched + selected + unmatched
     return gr.CheckboxGroup.update(choices=sorted_styles)
+
+
+def get_hidden_styles_path():
+    user_dir = Path(cli_args.user_dir)
+    user_dir.mkdir(parents=True, exist_ok=True)
+    return user_dir / 'hidden_styles.json'
+
+
+def load_hidden_styles():
+    file_path = get_hidden_styles_path()
+    if not file_path.exists():
+        return []
+    try:
+        with file_path.open('r', encoding='utf-8') as fp:
+            data = json.load(fp)
+            if isinstance(data, list):
+                return [str(x) for x in data if isinstance(x, str)]
+    except Exception as e:
+        interpret('[Sorter] Failed to load hidden styles:', e)
+    return []
+
+
+def save_hidden_styles(hidden_list_json):
+    if not hidden_list_json:
+        return
+    try:
+        hidden_data = json.loads(hidden_list_json)
+        if not isinstance(hidden_data, list):
+            return
+        file_path = get_hidden_styles_path()
+        with file_path.open('w', encoding='utf-8') as fp:
+            json.dump(sorted(list(set(hidden_data))), fp, indent=4, ensure_ascii=False)
+    except Exception as e:
+        interpret('[Sorter] Failed to save hidden styles:', e)
+    return

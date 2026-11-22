@@ -2,14 +2,14 @@
     "default_engine": {
         "backend_engine": "Flux",
         "disvisible": ["backend_selection", "performance_selection", "refiner_model", "sharpness"],
-        "disinteractive": ["enhance_checkbox", "input_image_checkbox", "refiner_model"],
+		"disinteractive": ["enhance_checkbox"],
         "backend_params": {
             "task_method": "ZIB",
             "clip_model": "Qwen_3_4b-Q6_K.gguf",
             "base_model_dtype": "fp8_e4m3fn"
         }
     },
-    "default_model": "z-img_fp8-e4m3fn.safetensors",
+    "default_model": "Z-Image/z-img_fp8-e4m3fn.safetensors",
     "default_refiner": "None",
     "default_refiner_switch": 0.6,
     "default_loras": [
@@ -55,7 +55,7 @@
     "default_aspect_ratio": "0*0",
     "default_overwrite_step": 30,
     "checkpoint_downloads": {
-        "z-img_fp8-e4m3fn.safetensors": "https://huggingface.co/drbaph/Z-Image-fp8/resolve/main/z-img_fp8-e4m3fn.safetensors"
+        "Z-Image/z-img_fp8-e4m3fn.safetensors": "https://huggingface.co/drbaph/Z-Image-fp8/resolve/main/z-img_fp8-e4m3fn.safetensors"
     },
     "clip_downloads": {
         "Qwen_3_4b-Q6_K.gguf": "https://huggingface.co/DavidDragonsage/FooocusPlus/resolve/main/support/Qwen_3_4b-Q6_K.gguf"

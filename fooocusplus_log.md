@@ -1,3 +1,92 @@
+# 1.1.8 Introduce Comfy Input Image Mode
+
+* Introduced the Comfy Input Image panel
+  * It opens if a Comfy preset is selected
+    and Input Image is enabled
+  * Or if "SDXL in Comfy Mode" is selected
+    and Input Image is enabled
+* Introduced Comfy Upscale to the new panel
+  * Upscales the upscale canvas image, by default
+  * If Auto-Upscale on, Upscales all generated images
+  * Fast Upscale uses UltraSharp + Lanczos sampling
+  * The Upscaling Multiplier ranges from 1 to 4
+  * Upscale Variation adjusts from 0.1 to 0.7
+* Added default_sd1_5_upscale=True to config
+  * if enabled, SD1.5 presets Auto-Upscale by default
+* Image & Log Metadata saves "Upscaled to" data
+  * the Image Type field saves the Comfy Upscale mode
+* The Style Selector now uses static thumbnails
+* Styles may be optionally hidden
+  * Hidden Styles can be restored from the Hidden tab
+* Introduced the Krea 2 Base Preset Category:
+  * Krea2-Base
+  * Krea2-Base_4G
+  * Krea2-Base_5G
+  * Krea2-Base_8G
+* Introduced the Krea 2 Turbo Preset Category:
+  * Krea2-Turbo
+  * Krea2-Turbo_4G
+  * Krea2-Turbo_5G
+  * Krea2-Turbo_8G
+* Introduced the SDXL_GGUF Preset Category:
+  * 2GB_AniPencil_8G
+  * 2GB_Cheyenne_8G
+  * 2GB_CheynAlt_8G
+  * 2GB_Elsewhere_8G
+  * 2GB_Jugg8_8G
+  * 2GB_Jugg9_8G
+  * 2GB_Magick_8G
+  * 2GB_Pony_8G
+  * 2GB_Pony_Turbo_8G
+  * 2GB_RealVisXL_8G
+  * 2GB_SDXL_8G
+  * 2GB_SDXL_Turbo_8G
+* Comfy Node Maintenance Report:
+  * modified ComfyUI-GGUF\tools\convert_quant.py
+    to support SDXL quantization
+* Comfy Workflow Maintenance Report:
+  * added krea2_base_AIO
+  * added krea2_base
+  * added krea2_base_gguf
+  * added krea2_turbo_AIO
+  * added krea2_turbo
+  * added krea2_turbo_gguf
+  * added sdxl_base
+  * added sdxl_base_gguf
+  * added sdxl_pony_gguf
+* Krea 2 uses these VAEs:
+  * Greyscale | krea2_greyscale_vae_FP.safetensors
+  * HighRes | hdrVAEAnimaKrea2QWEN_bf16.safetensors
+    (Felldude's HighRes | HDR is the default)
+  * Sepia | krea2_sepia_vae_FP.safetensors
+  * Standard | qwen_image_vae.safetensors
+* Added Felldude's FlashPhoto Flux/Z-Image VAE
+* Introduced these default GGUF Krea 2 LoRAs:
+  * alcaitiff Detailer-KREA2
+  * alcaitiff WarmLightSlider-KREA2_v1
+* Introduced these default GGUF Z-Image LoRAs:
+  * alcaitiff Z-Detail-Slider
+  * alcaitiff Z-Light-Slider
+* Introduced the "SDXL in Comfy Mode" checkbox
+  * located above the Preset Category dropdown
+  * when enabled, all SDXL presets run in Comfy
+  * the Input Image panel also switches to Comfy
+  * tracked by config.default_comfy_sdxl_checkbox
+  * defaults to False
+* "Sampling Sharpness" & "Use Seamless Tiling"
+  are now invisible in Comfy mode.
+* Resolved intermittent errors with seed handling
+* Stopped blank prompt reverting to previous prompt
+* Debugged Sampler/Scheduler updates from metadata
+* Resolved errors in Image Editor Transformations
+* Upgraded error control for downloading models
+* Prevented Fooocus V2 style prompt duplication
+* Moved comfy_task.py from enhanced to backend_base
+* Release Date: November 21st, 2026<br/>
+* Hotfix0:
+<br/><br/>
+
+
 # 1.1.7 Introduce Advanced VAE Control
 
 * Z-Image AIO presets now override the built-in VAE

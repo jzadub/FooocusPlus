@@ -12,6 +12,7 @@ from pathlib import Path
 import common
 import ldm_patched.modules.model_management as model_management
 import modules.flags as flags
+import modules.loader as loader
 from . import utils
 from enhanced.translator import interpret
 
@@ -88,7 +89,7 @@ def get_images(ws, prompt, callback=None):
                 current_total_steps = message['data']['max']
         else:
             if current_type == 'progress':
-                if prompt[current_node]['class_type'] in ['KSampler', 'SamplerCustomAdvanced', 'TiledKSampler'] and callback is not None:
+                if prompt[current_node]['class_type'] in ['KSampler', 'SamplerCustomAdvanced', 'TiledKSampler', 'UltimateSDUpscale'] and callback is not None:
                     if current_step == last_step:
                         preview_image.append(out[8:])
                     else:
@@ -168,7 +169,9 @@ def prune_inactive_loras(workflow: dict) -> None:
 def ensure_vae_downloaded(vae_filename: str) -> None:
     """
     Checks if a VAE file is physically on disk
-    in the VAE directory. If missing, resolves its URL from the flags catalogues and downloads it on demand.
+    in the VAE directory. If missing, resolves its
+    URL from the flags catalogues and downloads it
+    on demand.
     """
     if not vae_filename or vae_filename == 'Default (model)':
         return
@@ -176,32 +179,31 @@ def ensure_vae_downloaded(vae_filename: str) -> None:
     clean_vae = flags.extract_vae_filename(vae_filename)
     vae_disk_path = Path(common.path_vae) / clean_vae
 
-    if not vae_disk_path.is_file():
-        catalog = {}
-        if hasattr(flags, 'SDXL_VAES'): catalog.update(flags.SDXL_VAES)
-        if hasattr(flags, 'SD15_VAES'): catalog.update(flags.SD15_VAES)
-        if hasattr(flags, 'FLUX_VAES'): catalog.update(flags.FLUX_VAES)
-        if hasattr(flags, 'SD3_VAES'): catalog.update(flags.SD3_VAES)
+    catalog = {}
+    if hasattr(flags, 'SDXL_VAES'): catalog.update(flags.SDXL_VAES)
+    if hasattr(flags, 'SD15_VAES'): catalog.update(flags.SD15_VAES)
+    if hasattr(flags, 'FLUX_VAES'): catalog.update(flags.FLUX_VAES)
+    if hasattr(flags, 'SD3_VAES'): catalog.update(flags.SD3_VAES)
+    if hasattr(flags, 'KREA_VAES'): catalog.update(flags.KREA_VAES)
 
-        download_url = None
-        for label, url in catalog.items():
-            if flags.extract_vae_filename(label) == clean_vae:
-                download_url = url
-                break
+    download_url = None
+    for label, url in catalog.items():
+        if flags.extract_vae_filename(label) == clean_vae:
+            download_url = url
+            break
 
-        # Direct fallback for standard SDXL VAE
-        if not download_url and clean_vae == 'sdxl_vae.safetensors':
-            download_url = 'https://huggingface.co/stabilityai/sdxl-vae/resolve/main/sdxl_vae.safetensors'
+    # Direct fallback for standard SDXL VAE
+    if not download_url and clean_vae == 'sdxl_vae.safetensors':
+        download_url = 'https://huggingface.co/stabilityai/sdxl-vae/resolve/main/sdxl_vae.safetensors'
 
-        if download_url:
-            interpret('[ComfyClient] Downloading on-demand VAE:', f'{clean_vae}...')
-            import modules.loader as loader
-            loader.load_file_from_url(
-                url=download_url,
-                model_dir=str(Path(common.path_vae)),
-                file_name=clean_vae
-            )
-            common.MODELS_INFO.refresh_from_path()
+    if download_url and not loader.is_file_complete(vae_disk_path, download_url):
+        interpret('[ComfyClient] Downloading on-demand VAE:', f'{clean_vae}...')
+        loader.load_file_from_url(
+            url=download_url,
+            model_dir=str(Path(common.path_vae)),
+            file_name=clean_vae
+        )
+        common.MODELS_INFO.refresh_from_path()
     return
 
 
@@ -251,14 +253,13 @@ def override_vae_loader(workflow: dict, params=None) -> None:
             if ckpt_path and not has_embedded_vae(ckpt_path):
                 selected_vae = 'vae-ft-mse-840000-ema-pruned.safetensors'
                 vae_disk_path = Path(common.path_vae) / selected_vae
+                url = flags.SD15_VAES.get(
+                    'SAI | vae-ft-mse-840000-ema-pruned.safetensors',
+                    'https://huggingface.co/stabilityai/sd-vae-ft-mse-original/resolve/main/vae-ft-mse-840000-ema-pruned.safetensors'
+                )
 
-                if not vae_disk_path.is_file():
+                if not loader.is_file_complete(vae_disk_path, url):
                     interpret('[ComfyClient] Downloading fallback SD1.5 VAE:', f'{selected_vae}...')
-                    import modules.loader as loader
-                    url = flags.SD15_VAES.get(
-                        'SAI | vae-ft-mse-840000-ema-pruned.safetensors',
-                        'https://huggingface.co/stabilityai/sd-vae-ft-mse-original/resolve/main/vae-ft-mse-840000-ema-pruned.safetensors'
-                    )
                     loader.load_file_from_url(
                         url=url,
                         model_dir=str(Path(common.path_vae)),
@@ -357,6 +358,174 @@ def override_vae_loader(workflow: dict, params=None) -> None:
     return
 
 
+def inject_ultimate_sd_upscale(workflow: dict, params, images_map: dict = None, is_auto_upscale: bool = False) -> None:
+    """
+    Dynamically splices the UltimateSDUpscale node and
+    UpscaleModelLoader into any active ComfyUI workflow,
+    in memory. Supports both Standalone Canvas Upscale (Phase 1) and Auto-Upscale (Phase 2).
+    """
+    # 1. Locate the terminal SaveImageWebsocket node
+    # ('result_image')
+    result_node_id = None
+    for node_id, node in workflow.items():
+        if isinstance(node, dict) and node.get('class_type') == 'SaveImageWebsocket':
+            result_node_id = node_id
+            break
+
+    if not result_node_id:
+        interpret('[ComfyClient] ⚠️ Upscale injection aborted: result_image node not found.')
+        return
+
+    # 2. Locate the active VAEDecode node and its VAE link
+    decode_node_id = None
+    vae_link = None
+    img_input = workflow[result_node_id].get('inputs', {}).get('images')
+    if isinstance(img_input, list) and len(img_input) == 2:
+        candidate_decode_id = str(img_input[0])
+        candidate_node = workflow.get(candidate_decode_id, {})
+        if candidate_node.get('class_type') in ['VAEDecode', 'VAEDecodeTiled']:
+            decode_node_id = candidate_decode_id
+            vae_link = candidate_node.get('inputs', {}).get('vae')
+
+    # Fallback search for VAE if decode node didn't find it
+    if not vae_link:
+        for node_id, node in workflow.items():
+            if isinstance(node, dict) and node.get('class_type') in ['VAEDecode', 'VAEDecodeTiled']:
+                decode_node_id = node_id
+                vae_link = node.get('inputs', {}).get('vae')
+                break
+
+    # 3. Locate the active Model and Conditioning links
+    # from the primary Sampler
+    model_link = None
+    positive_link = None
+    negative_link = None
+
+    for node_id, node in workflow.items():
+        if not isinstance(node, dict):
+            continue
+        c_type = node.get('class_type')
+
+        # Standard KSampler (Z-Image, SDXL, SD1.5, Kolors)
+        if c_type in ['KSampler', 'TiledKSampler']:
+            inputs = node.get('inputs', {})
+            model_link = inputs.get('model')
+            positive_link = inputs.get('positive')
+            negative_link = inputs.get('negative')
+            break
+
+        # Advanced Samplers (Flux, SD3.5)
+        elif c_type == 'SamplerCustomAdvanced':
+            inputs = node.get('inputs', {})
+            guider_ref = inputs.get('guider')
+            if isinstance(guider_ref, list) and len(guider_ref) == 2:
+                guider_node = workflow.get(str(guider_ref[0]), {})
+                g_inputs = guider_node.get('inputs', {})
+                model_link = g_inputs.get('model')
+                positive_link = g_inputs.get('conditioning')
+                negative_link = positive_link  # Single-stream guiders
+            break
+
+    if not model_link or not vae_link:
+        interpret('[ComfyClient] ⚠️ Upscale injection aborted: model or VAE link could not be resolved.')
+        return
+
+    # 4. Extract parameters from the task packet
+    p = params.params if hasattr(params, 'params') and isinstance(params.params, dict) else {}
+    upscale_by = float(p.get('upscale_by', 2.0))
+    denoise = float(p.get('upscale_denoise', p.get('denoise', 0.25)))
+    seed = int(p.get('seed', 0))
+    steps = int(p.get('steps', 12 if 'turbo' in str(p.get('base_model', '')).lower() else 20))
+    cfg = float(p.get('cfg_scale', 1.0))
+    sampler_name = str(p.get('sampler', 'euler'))
+    scheduler = str(p.get('scheduler', 'simple'))
+
+    upscale_model_name = str(p.get('upscale_model_name', '4x-UltraSharp.pth'))
+    ultrasharp_path = Path(common.MODELS_INFO.get_file_path_by_name('upscale_models', upscale_model_name))
+    ultrasharp_url = 'https://huggingface.co/lokcx/4x-Ultrasharp/resolve/main/4x-UltraSharp.pth' if upscale_model_name == '4x-UltraSharp.pth' else None
+    if not common.MODELS_INFO.exists_model(catalog='upscale_models', model_path=upscale_model_name) or not loader.is_file_complete(ultrasharp_path, ultrasharp_url):
+        loader.download_ultrasharp_model()
+        common.MODELS_INFO.refresh_from_path()
+
+    # Adaptive tile sizing based on base model
+    base_model_str = str(p.get('base_model', '')).lower()
+    if 'sd1.5' in base_model_str or 'sd15' in base_model_str:
+        tile_size = 512
+    else:
+        tile_size = 1024
+
+    # 5. Allocate unique node IDs
+    highest_id = max([int(k) for k in workflow.keys() if k.isdigit()] + [150])
+    upscaler_loader_id = str(highest_id + 1)
+    ultimate_sd_id = str(highest_id + 2)
+    load_image_id = str(highest_id + 3)
+
+    # 6. Inject the UpscaleModelLoader node
+    workflow[upscaler_loader_id] = {
+        'inputs': {'model_name': upscale_model_name},
+        'class_type': 'UpscaleModelLoader',
+        '_meta': {'title': 'Upscale Model Loader'}
+    }
+
+    # 7. Resolve the source image link
+    if is_auto_upscale:
+        # Phase 2: Feed directly from the completed VAEDecode
+        source_image_link = [decode_node_id, 0]
+    else:
+        # Phase 1: Standalone Canvas Upscale
+        # — Inject LoadImage
+        uploaded_name = images_map.get('input_image', 'input_image.png') if images_map else 'input_image.png'
+        workflow[load_image_id] = {
+            'inputs': {
+                'image': uploaded_name,
+                'upload': 'image'
+            },
+            'class_type': 'LoadImage',
+            '_meta': {'title': 'Input Image'}
+        }
+        source_image_link = [load_image_id, 0]
+
+    # 8. Inject the UltimateSDUpscale node
+    workflow[ultimate_sd_id] = {
+        'inputs': {
+            'image': source_image_link,
+            'model': model_link,
+            'positive': positive_link,
+            'negative': negative_link if negative_link else positive_link,
+            'vae': vae_link,
+            'upscale_model': [upscaler_loader_id, 0],
+            'upscale_by': upscale_by,
+            'seed': seed,
+            'steps': steps,
+            'cfg': cfg,
+            'sampler_name': sampler_name,
+            'scheduler': scheduler,
+            'denoise': denoise,
+            'mode_type': 'Linear',
+            'tile_width': tile_size,
+            'tile_height': tile_size,
+            'mask_blur': 8,
+            'tile_padding': 32,
+            'seam_fix_mode': 'None',
+            'seam_fix_denoise': 1.0,
+            'seam_fix_width': 64,
+            'seam_fix_mask_blur': 8,
+            'seam_fix_padding': 16,
+            'force_uniform_tiles': True,
+            'tiled_decode': False,
+            'batch_size': 1
+        },
+        'class_type': 'UltimateSDUpscale',
+        '_meta': {'title': 'Ultimate SD Upscale'}
+    }
+
+    # 9. Rewire SaveImageWebsocket to output
+    # the upscaled image
+    workflow[result_node_id]['inputs']['images'] = [ultimate_sd_id, 0]
+    interpret(f'[ComfyClient] Successfully injected UltimateSDUpscale ({upscale_by}x, Denoise: {denoise})')
+    return
+
+
 def process_flow(flow_name, params, images, callback=None):
     global ws
 
@@ -441,12 +610,22 @@ def process_flow(flow_name, params, images, callback=None):
     try:
         prompt_str = params.convert2comfy(flowdata)
 
-        # Inject the pruner to safely clean up unmapped LoRA slots
+        # Inject the pruner to safely clean up
+        # unused LoRA slots
         prune_inactive_loras(prompt_str)
 
         # Dynamically override the VAE if a custom VAE
         # is selected in the UI dropdown or preset
         override_vae_loader(prompt_str, params)
+
+        # Dynamic Upscale Injection
+        is_upscale = False
+        if hasattr(params, 'params') and isinstance(params.params, dict):
+            is_upscale = params.params.get('is_comfy_upscale', False) or params.params.get('is_auto_upscale', False)
+
+        if is_upscale:
+            is_auto = params.params.get('is_auto_upscale', False)
+            inject_ultimate_sd_upscale(prompt_str, params, images_map=images_map, is_auto_upscale=is_auto)
 
         if not utils.echo_off:
             interpret('[ComfyClient] ComfyTask prompt:', prompt_str)
@@ -489,14 +668,42 @@ def process_flow(flow_name, params, images, callback=None):
                 # 5. Pad 1 pixel at the left edge
                 img[:, 0] = img[:, 1]
 
+    # Automatic Midtone Luminance Lift for Krea 2
+    # Brightens dark default Krea 2 output while
+    # preserving blacks and highlights.
+    # (Excluded for Standard qwen_image_vae and
+    # calibrated Greyscale/Sepia profiles)
+    vae_lower = str(active_vae).lower() if active_vae else ''
+    if (
+        'krea2' in str(flow_name).lower()
+        and 'qwen_image_vae' not in vae_lower
+        and 'greyscale' not in vae_lower
+        and 'sepia' not in vae_lower
+    ):
+        gamma = 1.25 # centre 1.18, range 1.12 to 1.25
+        inv_gamma = 1.0 / gamma
+        lut = np.clip(np.round(((np.arange(256) / 255.0) ** inv_gamma) * 255.0), 0, 255).astype(np.uint8)
+        imgs = [lut[img] if isinstance(img, np.ndarray) and img.dtype == np.uint8 else img for img in imgs]
+
     # Apply VAE sharpness to all decoded images:
     from modules.util import apply_optical_sharpness
     vae_sharpness = 0.0
     if params is not None and hasattr(params, 'params') and isinstance(params.params, dict):
         vae_sharpness = float(params.params.get('vae_sharpness', 0.0))
 
+    # Automatic Baseline Sharpness for Monochrome
+    # Krea 2 VAE Profiles (On-the-Fly Offset).
+    # Adds a +0.50 HDR baseline for Krea 2 monochrome
+    # profiles while preserving user offsets.
+    if active_vae:
+        vae_lower = str(active_vae).lower()
+        if 'krea2' in vae_lower and ('greyscale' in vae_lower or 'sepia' in vae_lower):
+            # Clamp to prevent extreme
+            # high-frequency clipping
+            vae_sharpness = max(-1.0, min(1.0, vae_sharpness))
+            vae_sharpness += 0.50
+
     if vae_sharpness != 0.0:
-        from modules.util import apply_optical_sharpness
         imgs = [apply_optical_sharpness(img, vae_sharpness) for img in imgs]
 
     return imgs

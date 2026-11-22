@@ -196,9 +196,17 @@ comfy_scheduler_list = COMFY_SCHEDULER_NAMES
 
 FLUX_VAES = {
     'Standard | ae.safetensors': 'https://huggingface.co/lovis93/testllm/resolve/ed9cf1af7465cebca4649157f118e331cf2a084f/ae.safetensors?download=true',
+    'FlashPhoto | flashPhotoFLUXVAE_v10.safetensors': 'https://huggingface.co/DavidDragonsage/FooocusPlus/resolve/main/support/VAE/flashPhotoFLUXVAE_v10.safetensors',
     'Greyscale | UltraFlux_greyscale_vae_FP.safetensors': 'https://huggingface.co/DavidDragonsage/FooocusPlus/resolve/main/support/VAE/UltraFlux_greyscale_vae_FP.safetensors',
     'HighRes | UltraFlux.safetensors': 'https://huggingface.co/Owen777/UltraFlux-v1/resolve/main/vae/diffusion_pytorch_model.safetensors?download=true',
     'Sepia | UltraFlux_sepia_vae_FP.safetensors': 'https://huggingface.co/DavidDragonsage/FooocusPlus/resolve/main/support/VAE/UltraFlux_sepia_vae_FP.safetensors'
+}
+
+KREA_VAES = {
+    'Greyscale | krea2_greyscale_vae_FP.safetensors': 'https://huggingface.co/DavidDragonsage/FooocusPlus/resolve/main/support/VAE/krea2_greyscale_vae_FP.safetensors',
+    'HighRes | hdrVAEAnimaKrea2QWEN_bf16.safetensors': 'https://huggingface.co/DavidDragonsage/FooocusPlus/resolve/main/support/VAE/hdrVAEAnimaKrea2QWEN_bf16.safetensors',
+    'Sepia | krea2_sepia_vae_FP.safetensors': 'https://huggingface.co/DavidDragonsage/FooocusPlus/resolve/main/support/VAE/krea2_sepia_vae_FP.safetensors',
+    'Standard | qwen_image_vae.safetensors': 'https://huggingface.co/Comfy-Org/Krea-2/resolve/main/vae/qwen_image_vae.safetensors'
 }
 
 SD15_VAES = {
@@ -248,7 +256,7 @@ backend_engines = ['Fooocus', 'Comfy', 'Kolors+', 'SD3x', 'HyDiT+', 'Flux']
 
 model_file_filter = {
         'SD3x'   : ['sd3'],
-        'Flux'   : ['flux', 'z-image', 'z_image'],
+        'Flux'   : ['flux', 'krea', 'z-image', 'z_image'],
         'HyDiT'  : ['hunyuan'],
         }
 model_file_filter['Fooocus'] = model_file_filter['SD3x'] + model_file_filter['Flux'] + model_file_filter['HyDiT']
@@ -297,7 +305,7 @@ default_class_params = {
         },
     'Kolors+': {
         'disvisible': ["backend_selection", "performance_selection", "refiner_model", "sharpness"],
-        'disinteractive': ["input_image_checkbox", "enhance_checkbox", "base_model", "refiner_model"],
+        'disinteractive': ["enhance_checkbox", "base_model", "refiner_model"],
         'available_aspect_ratios_selection': 'Standard',
         'available_sampler_name': comfy_sampler_list,
         'available_scheduler_name': comfy_scheduler_list,
@@ -308,7 +316,7 @@ default_class_params = {
         },
     'SD3x': {
         'disvisible': ["backend_selection", "performance_selection", "refiner_model", "sharpness"],
-        'disinteractive': ["input_image_checkbox", "enhance_checkbox", "refiner_model"],
+        'disinteractive': ["enhance_checkbox", "refiner_model"],
         'available_aspect_ratios_selection': 'Standard',
         'available_sampler_name': comfy_sampler_list,
         'available_scheduler_name': comfy_scheduler_list,
@@ -318,7 +326,7 @@ default_class_params = {
         },
     'HyDiT+': {
         'disvisible': ["backend_selection", "performance_selection", "refiner_model", "sharpness"],
-        'disinteractive': ["input_image_checkbox", "enhance_checkbox", "base_model", "scheduler_name"],
+        'disinteractive': ["enhance_checkbox", "base_model", "scheduler_name"],
         'available_aspect_ratios_selection': 'Standard',
         'available_sampler_name': comfy_sampler_list,
         'available_scheduler_name': comfy_scheduler_list,
@@ -328,7 +336,7 @@ default_class_params = {
         },
     'Flux': {
         'disvisible': ["backend_selection", "performance_selection", "refiner_model", "sharpness"],
-        'disinteractive': ["input_image_checkbox", "enhance_checkbox", "refiner_model"],
+        'disinteractive': ["enhance_checkbox", "refiner_model"],
         'available_aspect_ratios_selection': 'Standard',
         'available_sampler_name': comfy_sampler_list,
         'available_scheduler_name': comfy_scheduler_list,
@@ -340,7 +348,7 @@ default_class_params = {
         },
     'SD1': {
         'disvisible': ["backend_selection", "performance_selection", "sharpness"],
-        'disinteractive': ["input_image_checkbox", "enhance_checkbox", "refiner_model"],
+        'disinteractive': ["enhance_checkbox", "refiner_model"],
         'available_aspect_ratios_selection': 'SD1.5',
         'available_sampler_name': sampler_list,
         'available_scheduler_name': scheduler_list,

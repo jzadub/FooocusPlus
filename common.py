@@ -28,7 +28,14 @@ comfy_active = False
 
 # comfy_input_panel tracking
 comfy_input_tab_name = 'comfy_upscale'
-comfy_input_image_buffer = None
+comfy_auto_upscale = False
+comfy_fast_upscale = False
+was_sd15_preset = False
+saved_auto_upscale_before_sd15 = None
+comfy_upscale_image_buffer = None
+comfy_upscale_factor = 2.0
+comfy_upscale_denoise = 0.25
+comfy_upscale_model_name = '4x-UltraSharp.pth'
 
 # use for Comfy port tracking
 # now that it is dynamic
@@ -98,7 +105,7 @@ features_tab_name = 'edit'
 # updated by webui, read by async_worker:
 features_checkbox = False
 
-# Set by webui
+# Set by webui & meta_parser
 # Read by comfyclient, default_pipeline,
 # meta_parser, async_worker,
 # preset_resource and preset_support

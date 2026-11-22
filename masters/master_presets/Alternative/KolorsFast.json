@@ -3,9 +3,7 @@
         "backend_engine": "Kolors+",
         "disvisible": ["backend_selection", "performance_selection", "refiner_model", "sharpness"],
         "disinteractive": [ "base_model",
-            "enhance_checkbox",
-            "input_image_checkbox",
-            "refiner_model"],
+            "enhance_checkbox"],
         "backend_params": {
             "task_method": "kolors_text2image",
             "llms_model": "auto"

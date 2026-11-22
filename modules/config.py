@@ -325,6 +325,13 @@ default_image_prompt_advanced_checkbox = get_config_item_or_set_default(
     expected_type=bool
 )
 
+default_sd1_5_upscale = get_config_item_or_set_default(
+    key='default_sd1_5_upscale',
+    default_value=True,
+    validator=lambda x: isinstance(x, bool),
+    expected_type=bool
+)
+
 default_performance = get_config_item_or_set_default(
     key='default_performance',
     default_value=Performance.Speed.value,
@@ -565,7 +572,7 @@ default_max_lora_number = get_config_item_or_set_default(
 
 default_loras_min_weight = get_config_item_or_set_default(
     key='default_loras_min_weight',
-    default_value=-2,
+    default_value=-3,
     validator=lambda x: isinstance(x, numbers.Number) and -10 <= x <= 10,
     expected_type=numbers.Number
 )
@@ -911,6 +918,12 @@ default_sam_max_detections = get_config_item_or_set_default(
 example_inpaint_prompts = [[x] for x in example_inpaint_prompts]
 example_enhance_detection_prompts = [[x] for x in example_enhance_detection_prompts]
 
+# If True, SDXL generation uses Comfy:
+default_comfy_sdxl_checkbox = get_config_item_or_set_default(
+    key='default_comfy_sdxl_checkbox',
+    default_value=False,
+    validator=lambda x: isinstance(x, bool)
+)
 default_comfy_active_checkbox = get_config_item_or_set_default(
     key='default_comfy_active_checkbox',
     default_value=True,

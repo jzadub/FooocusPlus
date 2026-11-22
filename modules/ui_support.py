@@ -9,7 +9,7 @@ from pathlib import Path
 import common
 import enhanced.gallery as gallery_util
 import enhanced.superprompt as superprompt
-import enhanced.comfy_task as comfy_task
+import backend_base.comfy_task as comfy_task
 import modules.aspect_ratios as AR
 import modules.config as config
 import modules.constants as constants
@@ -692,6 +692,7 @@ def handle_comfy_active_change(
 
     # 2. Transition category between Comfy and SDXL
     if not enabled:
+        default_comfy_sdxl_checkbox = False
         if PR.category_selection == 'Favorite':
             target_category = 'SDXL_Favorite'
         elif PR.category_selection == 'LowVRAM_Favorite':
@@ -738,8 +739,14 @@ def handle_comfy_active_change(
         gr.update(visible=enabled), # iclight_row_prompts
         gr.update(visible=enabled), # iclight_row_links
         gr.update(visible=not enabled), # iclight_row_shield
-        gr.update(visible=enabled), # gateway_info_markdown
-        gr.update(visible=enabled), # btn_gateway
+        # gateway_info_markdown:
+        gr.update(visible=enabled),
+        # btn_gateway:
+        gr.update(visible=enabled),
+        # comfy_sdxl:
+        gr.update(visible=enabled),
+        # comfy_help_col:
+        gr.update(visible=enabled),
         gr.update(choices=category_choices, value=target_category), # category_selection
         gr.update(choices=preset_choices, value=target_preset),   # preset_selection
         gr.update(interactive=len(preset_choices) > 1)

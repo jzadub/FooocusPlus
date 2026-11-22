@@ -1,9 +1,9 @@
-import os
 import sys
 import modules.user_structure as US
 from pathlib import Path
 
-from modules.launch_util import is_win32_standalone_build, \
+from modules.launch_util import \
+    is_win32_standalone_build, \
     python_embedded_path
 
 
@@ -65,103 +65,13 @@ def get_fooocusplus_ver():
     return fooocusplus_ver, hotfix, hotfix_title
 
 
-def check_remote_pinokio_update() -> str | None:
-    """
-    Checks the remote GitHub repository's
-    fooocusplus_log.md for updates.
-    Returns the formatted remote version string
-    if an update is available, otherwise None.
-    """
-    import httpx
-    from packaging.version import parse as parse_version
-
-    raw_log_url = 'https://raw.githubusercontent.com/DavidDragonsage/FooocusPlus/main/fooocusplus_log.md'
-
-    try:
-        # Strict 3-second timeout ensures
-        # startup is never stalled if offline
-        with httpx.Client(timeout=3.0) as client:
-            response = client.get(raw_log_url)
-            if response.status_code != 200:
-                return None
-            remote_text = response.text
-    except Exception:
-        # Fails silently if user has no internet
-        # access or GitHub is unreachable
-        return None
-
-    # Parse the remote changelog lines
-    remote_lines = remote_text.splitlines()
-    remote_ver = US.locate_value(remote_lines, '# ', terminator=' ')
-    remote_ver_desc = US.locate_value(remote_lines, f'# {remote_ver} ', terminator='')
-
-    remote_hotfix = US.locate_value(remote_lines, '* Hotfix', terminator=':')
-    remote_hotfix_desc = US.locate_value(remote_lines, f'* Hotfix{remote_hotfix}:', terminator='')
-
-    if not remote_ver:
-        return None
-
-    # Calculate full remote version for
-    # mathematical comparison
-    remote_hotfix_clean = remote_hotfix.strip()
-    remote_hotfix_num = int(remote_hotfix_clean) if remote_hotfix_clean.isdigit() else 0
-    remote_full_ver = f'{remote_ver}.{remote_hotfix_num:02d}'
-
-    # Calculate full local version
-    local_ver, local_hotfix, _ = get_fooocusplus_ver()
-    local_hotfix_clean = local_hotfix.strip()
-    local_hotfix_num = int(local_hotfix_clean) if local_hotfix_clean.isdigit() else 0
-    local_full_ver = f'{local_ver}.{local_hotfix_num:02d}'
-
-    # Compare versions using packaging.version
-    try:
-        if parse_version(remote_full_ver) > parse_version(local_full_ver):
-            # Check if this is a new release version
-            # or a hotfix
-            if parse_version(remote_ver) > parse_version(local_ver):
-                version_label = f'FooocusPlus {remote_ver}'
-                desc = remote_ver_desc or 'New version release'
-            else:
-                version_label = f'FooocusPlus {remote_ver} Hotfix {remote_hotfix_clean}'
-                desc = remote_hotfix_desc or 'Bug fixes and performance improvements'
-            return version_label, desc
-    except Exception:
-        pass
-
-    return None
-
-
 def announce_version():
     # 1 = hotfix, 2 = new version
     import common
     import gradio as gr
-    from args_manager import args as cli_args
     from enhanced.translator import interpret
 
     global fooocusplus_ver, fooocusplus_line, hotfix, hotfix_line
-
-    # --- PINOKIO UPDATE NOTIFIER ---
-    if getattr(cli_args, 'gpu_type', '') == 'none':
-        update_info = check_remote_pinokio_update()
-        if update_info:
-            version_label, desc = update_info
-
-            # Terminal announcement
-            interpret(f'{version_label} available:', desc)
-            interpret('Please use the Pinokio dashboard to install the latest release.')
-
-            # Toast 1: Version & Changelog Description
-            available_txt = interpret('available:', '', silent=True)
-            desc_trans = interpret(desc, '', silent=True)
-            gr.Info(f'{version_label} {available_txt} {desc_trans}')
-
-            # Toast 2: Direct Action Instructions
-            action_txt = interpret('Please use the Pinokio dashboard to install the latest release.', '', silent=True)
-            gr.Info(action_txt)
-
-            return  # Skip native announce_version toast
-                    # when an external update is pending
-    # -------------------------------
 
     # Case 2: New Major/Minor Version Release
     if common.version_update == 2 and fooocusplus_ver[0] != '0':

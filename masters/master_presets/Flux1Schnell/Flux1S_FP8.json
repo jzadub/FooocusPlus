@@ -3,7 +3,7 @@
         "backend_engine": "Flux",
         "task_method": "flux_base",
 		"disvisible": ["backend_selection", "negative_prompt", "performance_selection", "refiner_model", "sharpness"],
-		"disinteractive": ["enhance_checkbox", "input_image_checkbox", "refiner_model"],
+		"disinteractive": ["enhance_checkbox"],
         "backend_params": {
             "task_method": "flux_base",
             "clip_model": "t5xxl_fp8_e4m3fn.safetensors",

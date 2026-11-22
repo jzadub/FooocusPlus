@@ -98,6 +98,8 @@ def reset_transforms(arg_image):
         False,          # mirror_chk default
         False,          # flip_vertical_chk default
         False,          # flip_AR_chk default
+        width,          # output_width reset
+        height,         # output_height reset
         *get_transparency_defaults() # reset transparency
     )
 
@@ -141,6 +143,8 @@ def reset_to_defaults(arg_image):
         False,          # edge_more_bool default
         8,              # posterize_slider default
         -1,             # solarize_int default
+        width,          # output_width initial value
+        height,         # output_height initial value
         *trans_defaults # insert using tuple unpacking
     )
 
@@ -159,34 +163,25 @@ def apply_hue_adjustment(edit_image, hue_int):
     return output_image
 
 
-def percent_resize_logic(input_image_data, percent_val, current_w_val, current_h_val):
+def percent_resize_logic(input_image_data, percent_val, left_val, right_val, upper_val, lower_val):
     if input_image_data is None:
-        return [gr.update()] * 4
+        return (gr.update(), gr.update(), *get_transparency_defaults())
 
     orig_w, orig_h = input_image_data.size
-    scale = percent_val / 100
 
-    # calculate NEW maximums based on the original dimensions
-    # the ceiling is limited to 2x the base image size
-    new_max_w = max(2, min(int(orig_w * scale), 2 * orig_w))
-    new_max_h = max(2, min(int(orig_h * scale), 2 * orig_h))
+    # Measure the active crop area (or full image if uncropped)
+    crop_w = max(2, int(right_val) - int(left_val)) if int(right_val) > int(left_val) else orig_w
+    crop_h = max(2, int(lower_val) - int(upper_val)) if int(lower_val) > int(upper_val) else orig_h
 
-    # Calculate PROPORTIONAL values:
-    # for example, if the user had the right crop slider
-    # at 50% of the old max, keep it at 50% of the new max
-    # Assume the sliders previously had a max of 'orig_w' and 'orig_h'
-    ratio_w = current_w_val / orig_w if orig_w > 0 else 0
-    ratio_h = current_h_val / orig_h if orig_h > 0 else 0
+    scale = max(0.02, min(float(percent_val) / 100.0, 2.0))
 
-    # apply ratios to new maximums to ensure they stay within bounds
-    new_val_w = max(2, min(int(new_max_w * ratio_w), new_max_w))
-    new_val_h = max(2, min(int(new_max_h * ratio_h), new_max_h))
+    # Scale the cropped dimensions proportionally
+    new_w = max(2, min(int(round(crop_w * scale)), 2048))
+    new_h = max(2, min(int(round(crop_h * scale)), 2048))
 
     return (
-        new_max_w, # width_slider value
-        new_max_h, # height_slider value
-        gr.update(maximum=new_max_w, value=new_val_w), # right_slider update
-        gr.update(maximum=new_max_h, value=new_val_h), # lower_slider update
+        new_w,  # width_slider
+        new_h,  # height_slider
         *get_transparency_defaults()
     )
 
@@ -217,6 +212,7 @@ def rotate_image_logic(edit_image, rotate_int):
         output_image = edit_image
     return output_image
 
+
 def crop_image_logic(processed_image, left_int, right_int, upper_int, lower_int):
     # ensure all parameters are in range
     width, height = processed_image.size
@@ -224,12 +220,17 @@ def crop_image_logic(processed_image, left_int, right_int, upper_int, lower_int)
     right = min(width, int(right_int))
     upper = max(0, int(upper_int))
     lower = min(height, int(lower_int))
+
     # validate parameters
-    if right_int <= left_int or lower_int <= upper_int:
-        output_image = processed_image
-    else:
-        # make the crop
-        output_image = processed_image.crop((left_int, upper_int, right_int, lower_int))
+    if right <= left or lower <= upper:
+        return processed_image
+
+    # If the boundaries cover the entire image,
+    # no crop is required
+    if left == 0 and upper == 0 and right >= width and lower >= height:
+        return processed_image
+
+    output_image = processed_image.crop((left, upper, right, lower))
     return output_image
 
 
@@ -277,26 +278,60 @@ def apply_enhancements(
     gaussian_blur_int: int,
     edge_more_bool: bool,
     posterize_int: int,
-    solarize_int: int
-) -> _Image.Image:
-    """
-    Apply all enhancements sequentially to the provided image.
-    """
+    solarize_int: int,
+    percent_val: float = 100.0
+) -> tuple:
     if input_image is None:
-        return None
+        return None, 0, 0
 
     if input_image.mode == 'RGBA':
         processed_image = input_image
     else:
         processed_image = input_image.convert('RGBA')
 
-    # --- Step 0: Initial Transformations (Rotation, Mirror, Invert) ---
+    # --- Step 0: Initial Transformations ---
     processed_image = rotate_image_logic(processed_image, rotate_int)
     processed_image = mirror_image_logic(processed_image, mirror_bool)
     processed_image = flip_vertical_image_logic(processed_image, flip_vertical_bool)
-    processed_image = width_image_logic(processed_image, width_int)
-    processed_image = height_image_logic(processed_image, height_int)
+
+    base_w, base_h = processed_image.size
+
+    # 1. Apply Crop
     processed_image = crop_image_logic(processed_image, left_int, right_int, upper_int, lower_int)
+    crop_w, crop_h = processed_image.size
+
+    # 2. Determine Scale Factor from Percent Resize
+    scale = max(0.02, min(float(percent_val) / 100.0, 2.0))
+    base_scaled_w = max(2, int(round(base_w * scale)))
+    base_scaled_h = max(2, int(round(base_h * scale)))
+
+    # Proportional size of the cropped area
+    # at current scale
+    prop_crop_w = max(2, int(round(crop_w * scale)))
+    prop_crop_h = max(2, int(round(crop_h * scale)))
+
+    # Determine final width:
+    # Matches if untouched at base size,
+    # scaled by percent, OR matched to active crop
+    if width_int == base_w or width_int == base_scaled_w or width_int == crop_w:
+        final_w = prop_crop_w
+    else:
+        # User explicitly dragged Resize Width
+        # to a custom independent value
+        final_w = max(2, width_int)
+
+    # Determine final height:
+    if height_int == base_h or height_int == base_scaled_h or height_int == crop_h:
+        final_h = prop_crop_h
+    else:
+        # User explicitly dragged Resize Height
+        # to a custom independent value
+        final_h = max(2, height_int)
+
+    # Only resize if final dimensions
+    # differ from the cropped area
+    if (final_w, final_h) != (crop_w, crop_h):
+        processed_image = processed_image.resize((final_w, final_h), resample=Resampling.LANCZOS)
 
     # --- Step 1: Tonal Adjustments ---
     processed_image = ImageEnhance.Brightness(processed_image).enhance((brightness_int/100)+1)
@@ -353,7 +388,7 @@ def apply_enhancements(
         RGB_image.putalpha(a)
     processed_image = RGB_image
 
-    return processed_image, width_int, height_int
+    return processed_image, final_w, final_h
 
 
 # --- Save Image Section ---

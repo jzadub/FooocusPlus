@@ -4,8 +4,8 @@ import common
 import ldm_patched
 import modules.loader as loader
 
-from enhanced.backend import ComfyTaskParams
-from enhanced.translator import interpret_warn
+from backend_base.params_mapper import ComfyTaskParams
+from enhanced.translator import interpret
 
 
 default_method_names = ['Blend the Foreground with IC-Light']
@@ -157,6 +157,8 @@ def get_comfy_task(task_name, task_method, default_params, input_images, options
 
     comfy_params = ComfyTaskParams(default_params)
     base_model = default_params.get('base_model', '')
+    # auto-bind input images, if any:
+    images = {'input_image': input_images[0]} if input_images is not None and len(input_images) > 0 else None
 
     if task_name == 'default':
         if input_images is None:
@@ -185,6 +187,7 @@ def get_comfy_task(task_name, task_method, default_params, input_images, options
         else:
             raise ValueError("IC-Light must be enabled to run the 'default' Comfy task engine.")
 
+
     elif task_name == 'SD3x':
         if '.gguf' in base_model.lower():
             # route GGUF models to the GGUF workflow
@@ -193,7 +196,7 @@ def get_comfy_task(task_name, task_method, default_params, input_images, options
         else:
             if 'base_model_dtype' in default_params:
                 comfy_params.delete_params(['base_model_dtype'])
-        return ComfyTask(task_method, comfy_params)
+        return ComfyTask(task_method, comfy_params, images)
 
     elif task_name == 'Kolors+':
         if 'llms_model' not in default_params or default_params['llms_model'] == 'auto':
@@ -201,15 +204,57 @@ def get_comfy_task(task_name, task_method, default_params, input_images, options
                 'llms_model': 'quant4' if common.total_vram_gb < 8.0 else 'quant8' if common.total_vram_gb < 16.0 else 'fp16'
             })
         check_download_kolors_model()  # Preserved as a special dependency pipeline
-        return ComfyTask(task_method, comfy_params)
+        return ComfyTask(task_method, comfy_params, images)
 
     elif task_name in ['HyDiT+']:
         # Block-level download checks removed to delegate to the async lazy downloader
-        return ComfyTask(task_method, comfy_params)
+        return ComfyTask(task_method, comfy_params, images)
 
     elif task_name == 'Flux':
         base_model = default_params.get('base_model', '')
-        is_z_model = 'z-image' in base_model.lower() or 'z_image' in base_model.lower() or 'z-img' in base_model.lower() or 'z_img' in base_model.lower()
+        is_z_model = any(k in base_model.lower() for k in ['z-image', 'z_image', 'z-img', 'z_img'])
+        is_krea_model = 'krea' in base_model.lower() or (isinstance(task_method, str) and 'krea' in task_method.lower())
+
+        # 0. Handle Krea 2 Models (Exclusive Logic)
+        if is_krea_model:
+            base_model_key = f'checkpoints/{base_model}'
+            is_turbo = 'turbo' in base_model.lower()
+
+            # Check if this is an All-In-One
+            # (AIO) checkpoint (> 15 GB)
+            is_all_in_one = False
+            if common.MODELS_INFO.exists_model_key(base_model_key):
+                model_size_gb = common.MODELS_INFO.get_model_key_info(base_model_key)['size'] / (1024 * 1024 * 1024)
+                if model_size_gb > 15.0:
+                    is_all_in_one = True
+
+            if is_all_in_one:
+                # Silently shift to the
+                # appropriate AIO workflow;
+                # no external CLIP required
+                task_method = 'krea2_turbo_AIO' if is_turbo else 'krea2_base_AIO'
+                comfy_params.delete_params(['clip_model', 'base_model_dtype'])
+                interpret(f'[ComfyTask] Detected monolithic Krea 2 AIO checkpoint ({model_size_gb:.2f} GB). Routing to {task_method}.')
+                return ComfyTask(task_method, comfy_params, images)
+
+            # Standard Modular / GGUF / Split Safetensors logic:
+            # If task_method is unset or
+            # lingering from another engine,
+            # dynamically assign it
+            if not (isinstance(task_method, str) and 'krea2' in task_method):
+                if is_turbo:
+                    task_method = 'krea2_turbo_gguf' if '.gguf' in base_model.lower() else 'krea2_turbo'
+                else:
+                    task_method = 'krea2_base_gguf' if '.gguf' in base_model.lower() else 'krea2_base'
+
+            if comfy_params.params.get('clip_model') in ['auto', None]:
+                comfy_params.update_params({'clip_model': 'qwen3vl_4b_fp8_scaled.safetensors'})
+
+            if '.gguf' in base_model.lower():
+                comfy_params.delete_params(['base_model_dtype'])
+
+            return ComfyTask(task_method, comfy_params, images)
+
 
         # 1. Handle Z-IMAGE Models (Exclusive Logic)
         if is_z_model:
@@ -244,11 +289,11 @@ def get_comfy_task(task_name, task_method, default_params, input_images, options
                 elif comfy_params.params.get('base_model_dtype') == 'auto':
                     comfy_params.update_params({'base_model_dtype': 'fp8_e4m3fn'})
 
-            return ComfyTask(task_method, comfy_params)
+            return ComfyTask(task_method, comfy_params, images)
 
-        # -------------------------------------------
+        # ------------------------------------
         # FLUX DEV/SCHENLL/KREA/ALL-IN-ONE FP8
-        # -------------------------------------------
+        # -------------------------------------
 
         # SAFETY CHECK: If a Z-Image workflow is
         # lingering but the model is standard,
@@ -272,7 +317,7 @@ def get_comfy_task(task_name, task_method, default_params, input_images, options
             if task_method == 'flux_base':
                 task_method = 'flux_base_AIO'
             comfy_params.delete_params(['clip_model', 'base_model_dtype'])
-            return ComfyTask(task_method, comfy_params)
+            return ComfyTask(task_method, comfy_params, images)
 
         # -------------------------------------------
         # 4. FLUX SPLIT MODEL ARCHITECTURES
@@ -315,7 +360,7 @@ def get_comfy_task(task_name, task_method, default_params, input_images, options
             task_method = 'flux_base'
 
     # Fallback for SD1.5 and custom presets
-    return ComfyTask(task_method, comfy_params)
+    return ComfyTask(task_method, comfy_params, images)
 
 
 def fixed_width_height(width, height, factor):

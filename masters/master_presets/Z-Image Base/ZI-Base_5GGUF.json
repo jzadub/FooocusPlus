@@ -2,7 +2,7 @@
     "default_engine": {
         "backend_engine": "Flux",
 		"disvisible": ["backend_selection", "performance_selection", "refiner_model", "sharpness"],
-		"disinteractive": ["enhance_checkbox", "input_image_checkbox", "refiner_model"],
+		"disinteractive": ["enhance_checkbox"],
         "backend_params": {
             "task_method": "ZIB_gguf",
             "clip_model": "Qwen_3_4b-Q6_K.gguf",
@@ -14,13 +14,13 @@
     "default_refiner_switch": 0.6,
     "default_loras": [
         [
-            true,
-            "None",
+            false,
+            "Z-Image/Z-Detail-Slider.safetensors",
             1.0
         ],
         [
-            true,
-            "None",
+            false,
+            "Z-Image/Z-Light-Slider.safetensors",
             1.0
         ],
         [
@@ -58,5 +58,8 @@
         "Z-Image/z_image-Q5_K_M.gguf": "https://huggingface.co/jayn7/Z-Image-GGUF/resolve/main/z_image-Q5_K_M.gguf"
     },
     "clip_downloads": {"Qwen_3_4b-Q6_K.gguf": "https://huggingface.co/DavidDragonsage/FooocusPlus/resolve/main/support/Qwen_3_4b-Q6_K.gguf"},
-    "lora_downloads": {}
+    "lora_downloads": {
+        "Z-Image/Z-Detail-Slider.safetensors": "https://huggingface.co/DavidDragonsage/FooocusPlus/resolve/main/support/LoRAs/Z-Detail-Slider.safetensors",
+        "Z-Image/Z-Light-Slider.safetensors": "https://huggingface.co/DavidDragonsage/FooocusPlus/resolve/main/support/LoRAs/Z-Light-Slider.safetensors"
+    }
 }

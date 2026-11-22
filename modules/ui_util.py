@@ -305,7 +305,9 @@ def security_warn():
 
 def security_alert():
     try:
-        if (cli_args.listen == "127.0.0.1") and (cli_args.port == 7860):
+        # Suppress port alert on localhost when
+        # running under Pinokio (gpu_type == 'none')
+        if (cli_args.listen == '127.0.0.1') and (cli_args.port == 7860 or cli_args.gpu_type == 'none'):
             alert = False
         else:
             alert = True

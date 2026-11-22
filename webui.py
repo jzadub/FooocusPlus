@@ -32,7 +32,7 @@ import modules.ui_support as UIS
 import modules.ui_util as UIU
 import modules.user_structure as US
 
-import enhanced.comfy_task as comfy_task
+import backend_base.comfy_task as comfy_task
 import enhanced.editor as edit
 import enhanced.enhanced_parameters as enhanced_parameters
 import enhanced.gallery as gallery_util
@@ -100,7 +100,7 @@ with common.GRADIO_ROOT:
                         # obsolete hidden preset code
                         # disable the iFrame display of help for preset selections:
                         preset_instruction = gr.HTML(visible=False,
-                        value=UIS.preset_no_instruction())
+                        value= UIS.preset_no_instruction())
 
                         bar_buttons = []
                         fav_title = interpret('Favorites', silent=True)
@@ -312,12 +312,12 @@ with common.GRADIO_ROOT:
                         input_image_checkbox = gr.Checkbox(
                             label='Input Image',
                             value = config.default_input_image_checkbox,
-                            interactive = not common.default_engine,
+                            interactive = True,
                             container=False)
                     with gr.Column(min_width=0, scale=1):
                         preset_bar_checkbox = gr.Checkbox(
                             label='Preset Bar',
-                            value=config.enable_preset_bar,
+                            value = config.enable_preset_bar,
                             container=False)
                     with gr.Column(min_width=0, scale=0,
                             elem_id='preset_wrapper_col'):
@@ -565,12 +565,12 @@ with common.GRADIO_ROOT:
                                     elem_classes='edit_check',
                                     interactive=True,
                                     info='Turn Upside-Down')
-                                crop_width = gr.Textbox(
-                                    label='Crop Width',
+                                output_width = gr.Textbox(
+                                    label='Output Width',
                                     value=1024,
                                     interactive=False)
-                                crop_height = gr.Textbox(
-                                    label='Crop Height',
+                                output_height = gr.Textbox(
+                                    label='Output Height',
                                     value=1024,
                                     interactive=False)
 
@@ -879,8 +879,9 @@ with common.GRADIO_ROOT:
                         with gr.Row():
                             gr.HTML('<a href="https://github.com/DavidDragonsage/FooocusPlus/wiki/VAE-Control,-with-SD3.5-Examples" target="_blank">\U0001F4DA VAE Control</a>&emsp;')
 
-            with gr.Row(visible=config.default_input_image_checkbox) as image_input_panel:
-                with gr.Tabs(selected=config.default_selected_image_input_tab_id):
+            # Native Fooocus Input Image Panel
+            with gr.Row( visible=config.default_input_image_checkbox and not bool(common.default_engine)) as image_input_panel:
+                with gr.Tabs( selected=config.default_selected_image_input_tab_id):
                     with gr.Tab(label='Upscale or Variation', id='uov_tab') as uov_tab:
                         with gr.Row():
                             with gr.Column():
@@ -1489,38 +1490,56 @@ with common.GRADIO_ROOT:
                             with gr.Column():
                                 gr.HTML('* The FreeU project page: <a href="https://github.com/ChenyangSi/FreeU" target="_blank">Free Lunch in Diffusion U-Net</a>')
 
-            with gr.Row(visible=config.default_input_image_checkbox and comfy_active) as comfy_input_panel:
-                with gr.Tabs(selected=config.default_selected_image_input_tab_id):
+            # Comfy Input Image Panel
+            with gr.Row( visible=config.default_input_image_checkbox and bool(common.default_engine)) as comfy_input_panel:
+                with gr.Tabs(selected='comfy_upscale_tab') as comfy_input_tabs:
                     with gr.Tab(label='Comfy Upscale', id='comfy_upscale_tab') as comfy_upscale_tab:
                         with gr.Row():
-                            with gr.Column():
-                                upscale_comfy_image = grh.Image(
-                                label='Image', source='upload',
-                                type='numpy', show_label=False)
-
-                            with gr.Column():
-                                mixing_uov_checkbox2 = gr.Checkbox(
-                                label='Mix Image Prompt & Vary/Upscale',
-                                value=False)
-
-                                uov_method2 = gr.Radio(
-                                    label='Upscale or Variation:',
-                                    choices=flags.uov_list,
-                                    value=config.default_uov_method)
-
+                            comfy_upscale_help = interpret('Full diffusion upscale takes 6 to 16x longer than standard generation, but is very practical for fast SD1.5 presets. Fast Upscale takes 2 to 20 seconds.', silent = True)
+                            gr.Markdown( value=comfy_upscale_help,
+                            elem_classes='dropdown_info'
+                            )
                         with gr.Row():
-                            overwrite_upscale_strength2 = gr.Slider(label='Adjust the Strength of Upscale Variation',
-                                minimum=0, maximum=1.0, step=0.001,
-                                value=config.default_overwrite_upscale,
-                                info='Variation Strength is also called "Denoising Strength"')
+                            with gr.Column():
+                                with gr.Row():
+                                    comfy_upscale_image = grh.Image(
+                                        label='Image',
+                                        source='upload',
+                                        type='filepath',
+                                        show_label=False
+                                    )
+                                with gr.Row():
+                                    gr.HTML('<a href="https://github.com/DavidDragonsage/FooocusPlus/wiki/Comfy-Upscale" target="_blank">\U0001F4DA Comfy Upscale</a>'
+                                    )
 
-                            overwrite_vary_strength2 = gr.Slider(label='Adjust the Strength of Image Variation',
-                                minimum=0, maximum=1.0, step=0.001, value=0.50,
-                                info='0.0="None", 0.50="Subtle", 0.85="Strong", 1.0="Max"')
-
-                        gr.HTML('<a href="https://github.com/lllyasviel/Fooocus/discussions/390" target="_blank">\U0001F4DA Documentation</a>')
-
-
+                            with gr.Column():
+                                with gr.Row():
+                                    comfy_auto_upscale = gr.Checkbox(
+                                        label='Auto-Upscale',
+                                        value= common.comfy_auto_upscale,
+                                        elem_classes= 'min_check',
+                                        container=False,
+                                        info= 'If enabled, all Comfy generated images will be automatically upscaled.'
+                                    )
+                                    comfy_fast_upscale = gr.Checkbox(
+                                        label='Fast Upscale',
+                                        value= common.comfy_fast_upscale,
+                                        elem_classes= 'min_check',
+                                        container=False,
+                                        info= 'Applies UltraSharp then Lanczos resampling.'
+                                    )
+                                with gr.Row():
+                                    comfy_upscale_factor = gr.Slider(label='Adjust Upscaling Multiplier',
+                                        minimum=1.0, maximum=4.0, step=0.05,
+                                        value= common.comfy_upscale_factor,
+                                        info= '1.0="Clarify Only", 1.5="50% Larger", 2.0="Twice the Size, 4.0="4K Resolution"'
+                                    )
+                                with gr.Row():
+                                    comfy_upscale_denoise = gr.Slider(label='Adjust the Strength of Upscale Variation',
+                                        minimum=0.10, maximum=0.70, step=0.01,
+                                        value= common.comfy_upscale_denoise,
+                                        info= 'Recommended: 0.15 to 0.40. Use lower denoising values (0.15–0.25) on large upscales to prevent phantom subject creation.'
+                                    )
 
             with gr.Accordion(label='Wildcards', visible=True, open=False) as prompt_wildcards:
                 wildcards_list = gr.Dataset(components=[prompt], type='index',
@@ -1569,8 +1588,14 @@ with common.GRADIO_ROOT:
 
         with gr.Column(scale=1, visible=config.default_advanced_checkbox, elem_id="scrollable-box-hidden") as advanced_column:
             with gr.Tab(label='Settings', elem_id="scrollable-box"):
-                if not cli_args.disable_preset_selection and PR.get_preset_list():
-                    with gr.Group():
+                with gr.Group():
+                    comfy_sdxl = gr.Checkbox(
+                        label='SDXL in Comfy Mode',
+                        info='Use Comfy with SDXL compatible presets',
+                        value = config.default_comfy_sdxl_checkbox,
+                        visible = common.comfy_active)
+
+                    if not cli_args.disable_preset_selection and PR.get_preset_list():
 
                         if config.default_list_all_presets:
                             PR.category_selection = 'All'
@@ -1591,14 +1616,21 @@ with common.GRADIO_ROOT:
                             elem_id = 'preset_select',
                             visible=True, interactive=True)
 
-                with gr.Group():
+                with gr.Row():
+                    with gr.Column(min_width=0, scale=1, visible = common.comfy_active) as comfy_help_col:
+                        gr.HTML('<font size="3">&emsp;<a href="https://github.com/DavidDragonsage/FooocusPlus/wiki/SDXL-in-Comfy-Mode" target="_blank">\U0001F4DA SDXL in Comfy Mode</a>')
 
+                    if not cli_args.disable_preset_selection and PR.get_preset_list():
+                        with gr.Column(min_width=0, scale=1):
+                            gr.HTML('<font size="3">&emsp;<a href="https://github.com/DavidDragonsage/FooocusPlus/wiki/Presets-An-Introduction" target="_blank">\U0001F4DA Presets</a>')
+
+                with gr.Group():
                     negative_prompt = gr.Textbox(
                         label='Negative Prompt',
                         elem_classes="text-arial",
                         placeholder="Describe what you do not want to see",
                         elem_id='negative_prompt',
-                        value=config.default_prompt_negative,
+                        value= config.default_prompt_negative,
                         visible = not common.default_engine,
                         lines=2)
 
@@ -1817,18 +1849,37 @@ with common.GRADIO_ROOT:
                     )
 
                 with gr.Row():
-                    with gr.Column(
-                    min_width=0, scale=1):
+                    with gr.Column(min_width=0, scale=1):
                         gr.HTML('<font size="3">&emsp;<a href="https://github.com/DavidDragonsage/FooocusPlus/wiki/Styles" target="_blank">\U0001F4DA Styles</a>')
 
-                    with gr.Column(
-                    min_width=0, scale=1):
+                    with gr.Column(min_width=0, scale=1):
                         gr.HTML('<font size="3">&emsp;<a href="https://github.com/DavidDragonsage/FooocusPlus/wiki/Styles:-Fooocus-V2-&-Substyles" target="_blank">\U0001F4DA Substyles</a>')
 
                 gradio_receiver_style_selections = gr.Textbox(elem_id='gradio_receiver_style_selections', visible=False)
+                hidden_styles_sync = gr.Textbox(elem_id='hidden_styles_sync', visible=False)
 
-                common.GRADIO_ROOT.load(lambda: gr.update(choices=copy.deepcopy(style_sorter.all_styles)),
-                    outputs=style_selections)
+                common.GRADIO_ROOT.load(
+                    fn=lambda: (
+                        gr.update(choices=copy.deepcopy(style_sorter.all_styles)),
+                        json.dumps(style_sorter.load_hidden_styles())
+                    ),
+                    outputs=[style_selections, hidden_styles_sync]
+                )
+
+                hidden_styles_sync.change(
+                    fn=style_sorter.save_hidden_styles,
+                    inputs=hidden_styles_sync,
+                    outputs=[]
+                )
+
+            with gr.Tab(label='Hidden'):
+                gr.HTML(
+                    '<div id="hidden-styles-panel">'
+                    '<p>Hidden Styles are saved to UserDir/hidden_styles.json.<br>'
+                    '"Restore" a style to return it to the Styles tab.<br>'
+                    '<span id="hidden-styles-status" role="status"></span></p>'
+                    '<div id="hidden-styles-grid"></div>'
+                    '</div>')
 
 
             with gr.Tab(label='Models', elem_id="scrollable-box"):
@@ -1938,7 +1989,7 @@ with common.GRADIO_ROOT:
                             info='Generate seamless repeating textures with any SDXL base model')
 
                         with gr.Row(elem_classes='elem_centre'):
-                            gr.HTML('<font size="3" style="margin-left: 12px; display: inline-block;"><a href="https://github.com/DavidDragonsage/FooocusPlus/wiki/Seamless-Tiling" target="_blank">\U0001F4DA Seamless Tiling</a>')
+                            seamless_tiling_help_link = gr.HTML('<font size="3" style="margin-left: 12px; display: inline-block;"><a href="https://github.com/DavidDragonsage/FooocusPlus/wiki/Seamless-Tiling" target="_blank">\U0001F4DA Seamless Tiling</a>')
 
                         output_format = gr.Radio(
                             label='Image Format',
@@ -2084,17 +2135,17 @@ with common.GRADIO_ROOT:
                                     'Open the Comfy UI in a new tab. To conserve VRAM, FooocusPlus should not be generating images while the gateway is open.',
                                     '', silent=True)
                                 gateway_info_markdown = gr.Markdown(
-                                    value=gateway_info,
+                                    value= gateway_info,
                                     visible= common.comfy_active,
                                     elem_classes= 'button_info2')
 
                             with gr.Row(
-                                elem_classes='elem_centre'):
+                                elem_classes = 'elem_centre'):
                                 gateway_value = interpret(
                                     'Open Comfy Gateway',
                                     '', silent=True)
                                 btn_gateway = gr.Button(
-                                    value=gateway_value,
+                                    value= gateway_value,
                                     visible= common.comfy_active,
                                     elem_classes=  'button_classic'
                                 )
@@ -2134,6 +2185,7 @@ with common.GRADIO_ROOT:
                                 info='Disable adaptive Guidance Scale & Override Sampling Step slider control when changing presets')
 
                             with gr.Row(
+                                # if not Pinokio:
                                 visible= cli_args.gpu_type != 'none'):
                                 remove_info = interpret(
                                     'Remove dynamic PyTorch components and configs',
@@ -2142,6 +2194,7 @@ with common.GRADIO_ROOT:
                                     value = remove_info,
                                     elem_classes = 'button_info2')
                             with gr.Row(
+                                # if not Pinokio:
                                 visible= cli_args.gpu_type != 'none',
                                 elem_classes = 'elem_centre'):
                                 remove_value = interpret(
@@ -2441,10 +2494,13 @@ with common.GRADIO_ROOT:
 
     def calculateTokenCounter(
         text, style_selections):
-        if len(text) < 1:
-            return 0
+        clean_text = text if isinstance(text, str) else ''
+        config.default_prompt = clean_text
+
+        if len(clean_text) < 1:
+            return '0'
         num = UIS.prompt_token_prediction(
-            text, style_selections)
+            clean_text, style_selections)
         return str(num)
 
     prompt.change(
@@ -3075,11 +3131,29 @@ with common.GRADIO_ROOT:
     # Seed Control Event Handlers & Helpers
 
     def image_seed_change(arg_image_seed):
-        if arg_image_seed.isdigit():
-            common.saved_seed = arg_image_seed
+        if arg_image_seed is None:
+            return gr.update()
+
+        # Strip whitespace, newlines, commas, and underscores
+        clean_seed = str(arg_image_seed).strip().replace(',', '').replace('_', '')
+
+        if clean_seed.isdigit():
+            # Cap at 19 digits
+            # (max uint64 / int64 limit)
+            if len(clean_seed) > 19:
+                clean_seed = clean_seed[:19]
+            common.saved_seed = clean_seed
+            common.image_seed = clean_seed
+            return gr.update(value=clean_seed)
+        elif clean_seed == '':
+            # Allow the box to remain empty while the
+            # user is actively clearing/typing/pasting
+            common.image_seed = ''
+            return gr.update(value='')
         else:
-            common.image_seed = common.saved_seed
-        return gr.update(value=common.saved_seed)
+            # Revert to last valid seed only if
+            # actual invalid characters were typed
+            return gr.update(value=common.saved_seed)
 
     image_seed.change(
         fn=image_seed_change,
@@ -3088,13 +3162,14 @@ with common.GRADIO_ROOT:
         queue=False, show_progress=False)
 
     def random_checked(bool_random):
-        return (gr.update(visible=not bool_random),
-                gr.update(value=common.saved_seed))
+        # Single clean update: toggles visibility
+        # and displays current saved seed
+        return gr.update(visible=not bool_random, value=common.saved_seed)
 
     seed_random.change(
         fn=random_checked,
         inputs=[seed_random],
-        outputs=[image_seed, image_seed],
+        outputs=[image_seed],
         queue=False, show_progress=False)
 
     def extra_variation_change(bool_extra_variation):
@@ -3121,17 +3196,18 @@ with common.GRADIO_ROOT:
     def refresh_seed(bool_random, seed_string):
         # called by generate_button.click()
         if bool_random:
-            common.saved_seed = random.randint(constants.MIN_SEED, constants.MAX_SEED)
+            common.saved_seed = str(random.randint(constants.MIN_SEED, constants.MAX_SEED))
             return common.saved_seed
         else:
             try:
-                seed_value = int(seed_string)
+                clean_str = str(seed_string).strip().replace(',', '').replace('_', '')
+                seed_value = int(clean_str)
                 if constants.MIN_SEED <= seed_value <= constants.MAX_SEED:
-                    common.saved_seed = seed_value
+                    common.saved_seed = str(seed_value)
                     return common.saved_seed
             except:
                 pass
-            common.saved_seed = random.randint(constants.MIN_SEED, constants.MAX_SEED)
+            common.saved_seed = str(random.randint(constants.MIN_SEED, constants.MAX_SEED))
             return common.saved_seed
 
 
@@ -3254,26 +3330,40 @@ with common.GRADIO_ROOT:
             input_image_checkbox],
         queue=False, show_progress=False)
 
+
+    def input_image_panel_toggle(is_checked):
+        is_comfy = bool(common.default_engine) or config.default_comfy_sdxl_checkbox
+        show_fooocus = is_checked and not is_comfy
+        show_comfy = is_checked and is_comfy
+        return (
+            gr.update(visible=show_fooocus),
+            gr.update(visible=show_comfy),
+            gr.update(choices=flags.Performance.list()),
+            gr.update(),  # style_selections
+            *[gr.update(interactive=True) for _ in range(18)]  # layout_image_tab
+        )
+
     def input_image_trigger(input_image_chk, features_chk):
         config.default_input_image_checkbox = input_image_chk
         if config.default_input_image_checkbox and features_chk:
             features_chk = False
             common.features_checkbox = False
-        return (gr.update(value=config.default_input_image_checkbox),
-                gr.update(value=features_chk))
+        return (
+            gr.update(
+                value=config.default_input_image_checkbox),
+            gr.update(value=features_chk))
 
     input_image_checkbox.change(
-        lambda x: [gr.update(visible=x),
-        gr.update(choices=flags.Performance.list()),
-        gr.update()] + [gr.update(interactive=True)]*18,
-        inputs=input_image_checkbox,
-        outputs=[image_input_panel] + layout_image_tab,
-            queue=False, show_progress=False, _js=switch_js
+        fn=input_image_panel_toggle,
+        inputs=[input_image_checkbox],
+        outputs=[image_input_panel, comfy_input_panel] + layout_image_tab,
+        queue=False, show_progress=False, _js=switch_js
     ).then(
         fn=input_image_trigger,
         inputs=[input_image_checkbox, features_checkbox],
         outputs=[input_image_checkbox, features_checkbox],
         queue=False, show_progress=False)
+
 
     def toggle_image_tab(styles):
         result = [gr.update(choices=flags.Performance.list()), gr.update()]
@@ -4020,6 +4110,125 @@ with common.GRADIO_ROOT:
         )
 
 
+    # Comfy Input Image Event Helpers
+    def comfy_input_tabs_select(evt: gr.SelectData):
+        # evt.value returns the label ('Comfy Upscale'), or track by evt.index
+        common.comfy_input_tab_name = 'comfy_upscale'
+        return
+
+
+    def comfy_upscale_image_upload(file_path):
+        if file_path is None:
+            common.comfy_upscale_image_buffer = None
+            return gr.update(), gr.update(), gr.update()
+
+            extracted_prompt = ''
+            extracted_negative = ''
+
+        try:
+            import numpy as np
+
+            with _Image.open(file_path) as pil_img:
+                # 1. Store the RGB pixel buffer for the worker
+                common.comfy_upscale_image_buffer = np.array(pil_img.convert('RGB'))
+
+                # 2. Extract embedded metadata directly from the file
+                meta_params, _ = meta_parser.read_meta_from_image(pil_img)
+                if isinstance(meta_params, dict):
+                    extracted_prompt = meta_params.get('Prompt', meta_params.get('prompt', ''))
+                    extracted_negative = meta_params.get('Negative Prompt', meta_params.get('negative_prompt', ''))
+
+                    # Directly update standard config for async_worker transfer
+                    if extracted_prompt:
+                        config.default_prompt = extracted_prompt
+                        interpret('[UI] Extracted positive prompt from image metadata:', extracted_prompt)
+                    if extracted_negative:
+                        config.default_prompt_negative = extracted_negative
+
+        except Exception as e:
+            interpret('[UI] Failed to parse uploaded image:', str(e))
+
+        # Explicit Intent: Dropping an image
+        # on the canvas turns off Auto-Upscale
+        common.comfy_auto_upscale = False
+
+        # Populate the UI textboxes directly
+        prompt_update = gr.update(value=extracted_prompt) if extracted_prompt else gr.update()
+        neg_update = gr.update(value=extracted_negative) if extracted_negative else gr.update()
+        auto_upscale_update = gr.update(value=False)
+
+        return prompt_update, neg_update, auto_upscale_update
+
+
+    def comfy_upscale_image_clear():
+        common.comfy_upscale_image_buffer = None
+        return
+
+    def comfy_auto_upscale_change(arg_auto_upscale):
+        common.comfy_auto_upscale = arg_auto_upscale
+        return common.comfy_auto_upscale
+
+    def comfy_fast_upscale_change(arg_fast_upscale):
+        common.comfy_fast_upscale = arg_fast_upscale
+        return (common.comfy_fast_upscale,
+                gr.update(visible=not arg_fast_upscale))
+
+    def comfy_upscale_factor_change(val):
+        common.comfy_upscale_factor = round(float(val), 2)
+        return
+
+    def comfy_upscale_denoise_change(val):
+        common.comfy_upscale_denoise = float(val)
+        return
+
+
+    # Comfy Upscale Input Image Event Handlers
+    comfy_input_tabs.select(
+        fn=comfy_input_tabs_select,
+        inputs=[],
+        outputs=[]
+    )
+
+    comfy_upscale_image.change(
+        fn=comfy_upscale_image_upload,
+        inputs=[comfy_upscale_image],
+        outputs=[prompt, negative_prompt, comfy_auto_upscale]
+    )
+    comfy_upscale_image.upload(
+        fn=comfy_upscale_image_upload,
+        inputs=[comfy_upscale_image],
+        outputs=[prompt, negative_prompt, comfy_auto_upscale]
+    )
+    comfy_upscale_image.clear(
+        fn=comfy_upscale_image_clear,
+        inputs=[],
+        outputs=[]
+    )
+
+    comfy_auto_upscale.change(
+        fn=comfy_auto_upscale_change,
+        inputs=comfy_auto_upscale,
+        outputs=comfy_auto_upscale
+    )
+    comfy_fast_upscale.change(
+        fn=comfy_fast_upscale_change,
+        inputs=comfy_fast_upscale,
+        outputs=[comfy_fast_upscale,
+                comfy_upscale_denoise]
+    )
+
+    comfy_upscale_factor.change(
+        fn=comfy_upscale_factor_change,
+        inputs=[comfy_upscale_factor],
+        outputs=[]
+    )
+    comfy_upscale_denoise.change(
+        fn=comfy_upscale_denoise_change,
+        inputs=[comfy_upscale_denoise],
+        outputs=[]
+    )
+
+
     # Image Editor Event Handlers and Helpers
 
     def scrub_int(val, default=0):
@@ -4063,12 +4272,12 @@ with common.GRADIO_ROOT:
         background_chk,
         erase_chk,
         transparency_slider,
-        output_transparency_state
+        output_transparency_state,
+        percent_resize_slider
     ]
 
 
     def on_ui_update_trigger(
-        # passed in from the input gr.Image value
         input_image_data: _Image.Image,
         brightness_int: int,
         contrast_int: int,
@@ -4097,6 +4306,8 @@ with common.GRADIO_ROOT:
         erase_chk: bool,
         trans_percent: int,
         output_transparency_data,
+        percent_resize_val: float = 100.0,
+        *, # ensures update_all is a keyword
         update_all=False):
         """
         Function triggered by any
@@ -4182,44 +4393,42 @@ with common.GRADIO_ROOT:
             gaussian_blur_int,
             edge_more_bool,
             posterize_int,
-            solarize_int
+            solarize_int,
+            percent_resize_val
         )
+        final_w, final_h = final_image.size
         results[0] = gr.update(value=final_image)
         results[1] = final_image
 
         if update_all:
             # --- Handle Slider Jumps ---
-            # only send a VALUE update if the
-            # synced value is different from
-            # what was provided. This prevents
-            # overwriting the user's current drag operation.
-            width_update = gr.update(value=synced_width) if synced_width != width_int else gr.update()
-            height_update = gr.update(value=synced_height) if synced_height != height_int else gr.update()
+            # Do NOT overwrite the user's Resize
+            # Width/Height sliders when cropping!
+            # Resize sliders stay at their set values;
+            # Output Width/Height reflects the crop.
+            width_update = gr.update()
+            height_update = gr.update()
 
-            # --- Handle Crop Maxima ---
+            # Crop sliders' maximum is bounded
+            # by the source image
             original_w, original_h = input_image_data.size
-            current_w, current_h = final_image.size
-            # ensure that new maxima do not auto-crop:
-            if current_w < original_w:
-                current_w = original_w
-            if current_w < right_int:
-                right_int = current_w
-            if current_h < original_h:
-                current_h = original_h
-            if current_h < lower_int:
-                lower_int = current_h
-            # update the maximum values for the crop sliders
-            right_max_update = gr.update(maximum=current_w, value=right_int)
-            lower_max_update = gr.update(maximum=current_h, value=lower_int)
+            if abs(rotate_int) % 180 != 0:
+                canvas_w, canvas_h = original_h, original_w
+            else:
+                canvas_w, canvas_h = original_w, original_h
+            right_max_update = gr.update(maximum=canvas_w, value=min(right_int, canvas_w))
+            lower_max_update = gr.update(maximum=canvas_h, value=min(lower_int, canvas_h))
 
             results[2] = width_update
             results[3] = height_update
             results[4] = right_max_update
             results[5] = lower_max_update
 
-        # Return everything together (Total 9 items)
-        return tuple(results) + tuple(trans_updates)
-
+        # results[0]: display, [1]: state,
+        # [2]: width_slider, [3]: height_slider,
+        # [4]: right_slider, [5]: lower_slider
+        results_with_dimensions = list(results) + [gr.update(value=final_w), gr.update(value=final_h)]
+        return tuple(results_with_dimensions) + tuple(trans_updates)
 
     def on_ui_update_trigger_update_all(*args):
         # Force update_all=True to ensure sliders
@@ -4259,22 +4468,28 @@ with common.GRADIO_ROOT:
         gaussian_blur_slider,
         edge_more_chk,
         posterize_slider,
-        solarize_slider
+        solarize_slider,
+        output_width,
+        output_height
     ]
 
     update_outputs_list = [
         output_image_display,
         output_image_state,
-        # this component will receive the
-        # 'gr.update(value=final_width)':
         width_slider,
-        # this component will receive the
-        # 'gr.update(value=final_height)':
         height_slider,
         right_slider,
-        lower_slider
+        lower_slider,
+        output_width,
+        output_height
     ]
 
+    # The State variable tracks previous rotation
+    # angle to compute the delta cleanly
+    last_rotate_angle = gr.State(value=0)
+
+    def reset_last_angle():
+        return 0
 
     # 1. Image Uploaded: Update displays, then reset all settings to default values.
     input_image_display.upload(
@@ -4282,6 +4497,10 @@ with common.GRADIO_ROOT:
         inputs=[input_image_display],
         outputs=[original_image_state, output_image_display,
             output_image_state, output_transparency_state]
+    ).then(
+        fn=reset_last_angle,
+        outputs=last_rotate_angle,
+        show_progress=False, queue=False
     ).then(
         fn=edit.reset_to_defaults,
         inputs=[input_image_display],
@@ -4344,56 +4563,121 @@ with common.GRADIO_ROOT:
 
     percent_resize_slider.release(
         fn=edit.percent_resize_logic,
-        inputs=[input_image_display,
-            percent_resize_slider,
-            right_slider, lower_slider],
+        inputs=[input_image_display, percent_resize_slider, left_slider, right_slider, upper_slider, lower_slider],
         outputs=[width_slider,
                 height_slider,
-                right_slider,
-                lower_slider,
-                *transparency_controls]
-    )
-
-    def change_aspect_ratio(width, height, right, lower):
-        width  = scrub_int(width)
-        height = scrub_int(height)
-        right  = scrub_int(right)
-        lower  = scrub_int(lower)
-
-        width, height = height, width
-        right, lower = lower, right
-        return (gr.update(value=width),
-                gr.update(value=height),
-                gr.update(value=right),
-                gr.update(value=lower)
-    )
-    rotate_slider.release(
-        fn=change_aspect_ratio,
-        inputs=[width_slider, height_slider,
-            right_slider, lower_slider],
-        outputs=[width_slider, height_slider,
-            right_slider, lower_slider],
+                *transparency_controls],
         show_progress=False, queue=False
     ).then(
-        fn=on_ui_update_trigger,
-        # reruns the entire stack using
-        # the current slider values:
+        fn=on_ui_update_trigger_update_all,
         inputs=all_inputs_for_update,
-        outputs=[*update_outputs_list,
-                 *transparency_controls],
+        outputs=[*update_outputs_list, *transparency_controls],
+        show_progress=False, queue=False
+    )
+
+    def handle_rotation(img, angle, prev_angle, w_val, h_val, l_val, r_val, u_val, b_val):
+        if img is None:
+            return (gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), prev_angle)
+
+        curr_angle = scrub_int(angle, 0)
+        old_angle = scrub_int(prev_angle, 0)
+        delta = (curr_angle - old_angle) % 360
+
+        if delta == 0:
+            return (gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), curr_angle)
+
+        # Base dimensions before this rotation step
+        orig_w, orig_h = img.size
+        # Current canvas dimensions depends
+        # on old_angle
+        if old_angle % 180 != 0:
+            cur_w, cur_h = orig_h, orig_w
+        else:
+            cur_w, cur_h = orig_w, orig_h
+
+        l = scrub_int(l_val, 0)
+        r = scrub_int(r_val, cur_w)
+        u = scrub_int(u_val, 0)
+        b = scrub_int(b_val, cur_h)
+        w = scrub_int(w_val, cur_w)
+        h = scrub_int(h_val, cur_h)
+
+        if delta == 90:
+            # 90 degrees counter-clockwise in PIL
+            new_w, new_h = cur_h, cur_w
+            new_l = u
+            new_r = b
+            new_u = cur_w - r
+            new_b = cur_w - l
+            w, h = h, w
+        elif delta == 270:
+            # 90 degrees clockwise (270 counter-clockwise)
+            new_w, new_h = cur_h, cur_w
+            new_l = cur_h - b
+            new_r = cur_h - u
+            new_u = l
+            new_b = r
+            w, h = h, w
+        elif delta == 180:
+            # 180 degrees
+            new_w, new_h = cur_w, cur_h
+            new_l = cur_w - r
+            new_r = cur_w - l
+            new_u = cur_h - b
+            new_b = cur_h - u
+        else:
+            return (gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), prev_angle)
+
+        return (
+            gr.update(maximum=new_w, value=new_l),          # left_slider
+            gr.update(maximum=new_w, value=new_r),          # right_slider
+            gr.update(maximum=new_h, value=new_u),          # upper_slider
+            gr.update(maximum=new_h, value=new_b),          # lower_slider
+            gr.update(maximum=max(new_w * 2, w), value=w),  # width_slider
+            gr.update(maximum=max(new_h * 2, h), value=h),  # height_slider
+            curr_angle                                      # last_rotate_angle update
+        )
+
+    rotate_slider.release(
+        fn=handle_rotation,
+        inputs=[
+            input_image_display,
+            rotate_slider,
+            last_rotate_angle,
+            width_slider,
+            height_slider,
+            left_slider,
+            right_slider,
+            upper_slider,
+            lower_slider
+        ],
+        outputs=[
+            left_slider,
+            right_slider,
+            upper_slider,
+            lower_slider,
+            width_slider,
+            height_slider,
+            last_rotate_angle
+        ],
+        show_progress=False, queue=False
+    ).then(
+        fn=on_ui_update_trigger_update_all,
+        inputs=all_inputs_for_update,
+        outputs=[*update_outputs_list, *transparency_controls],
         show_progress=False, queue=False
     )
 
     def update_width(left, right):
         left_val = scrub_int(left, 0)
         right_val = scrub_int(right, 0)
-        width = right_val - left_val
-        return gr.update(value=width)
+        width = max(2, right_val - left_val)
+        return gr.update(value=width), gr.update(value=width)
 
     left_slider.release(
         fn=update_width,
         inputs=[left_slider, right_slider],
-        outputs=crop_width,
+        outputs=[width_slider, output_width],
         show_progress=False, queue=False
     ).then(
         fn=on_ui_update_trigger,
@@ -4406,7 +4690,7 @@ with common.GRADIO_ROOT:
     right_slider.release(
         fn=update_width,
         inputs=[left_slider, right_slider],
-        outputs=crop_width,
+        outputs=[width_slider, output_width],
         show_progress=False, queue=False
     ).then(
         fn=on_ui_update_trigger,
@@ -4419,14 +4703,13 @@ with common.GRADIO_ROOT:
     def update_height(upper, lower):
         upper_val = scrub_int(upper, 0)
         lower_val = scrub_int(lower, 0)
-        height = lower_val - upper_val
-        return gr.update(value=height
-    )
+        height = max(2, lower_val - upper_val)
+        return gr.update(value=height), gr.update(value=height)
 
     upper_slider.release(
         fn=update_height,
         inputs=[upper_slider, lower_slider],
-        outputs=crop_height,
+        outputs=[height_slider, output_height],
         show_progress=False, queue=False
     ).then(
         fn=on_ui_update_trigger,
@@ -4439,10 +4722,10 @@ with common.GRADIO_ROOT:
     lower_slider.release(
         fn=update_height,
         inputs=[upper_slider, lower_slider],
-        outputs=crop_height,
+        outputs=[height_slider, output_height],
         show_progress=False, queue=False
     ).then(
-        on_ui_update_trigger,
+        fn=on_ui_update_trigger,
         inputs=all_inputs_for_update,
         outputs=[*update_outputs_list,
                  *transparency_controls],
@@ -4450,32 +4733,27 @@ with common.GRADIO_ROOT:
     )
 
 
-    def flip_aspect_ratio(
-        width, height, right, lower):
-        width  = scrub_int(width)
-        height = scrub_int(height)
-        right  = scrub_int(right)
-        lower  = scrub_int(lower)
+    def flip_aspect_ratio(img, width, height):
+        width = scrub_int(width, 2)
+        height = scrub_int(height, 2)
+        new_w, new_h = height, width
 
-        width, height = height, width
-        right, lower = lower, right
-        return (gr.update(value=width),
-                gr.update(value=height),
-                gr.update(value=right),
-                gr.update(value=lower)
-    )
+        if img is not None:
+            orig_w, orig_h = img.size
+            max_dim = max(orig_w, orig_h) * 2
+            return (
+                gr.update(maximum=max(max_dim, new_w), value=new_w),
+                gr.update(maximum=max(max_dim, new_h), value=new_h)
+            )
+        return gr.update(value=new_w), gr.update(value=new_h)
 
-    flip_AR_chk.change(
+    flip_AR_chk.input(
         fn=flip_aspect_ratio,
-        inputs=[width_slider, height_slider,
-            right_slider, lower_slider],
-        outputs=[width_slider,
-                height_slider,
-                right_slider,
-                lower_slider],
+        inputs=[input_image_display, width_slider, height_slider],
+        outputs=[width_slider, height_slider],
         show_progress=False, queue=False
     ).then(
-        fn=on_ui_update_trigger,
+        fn=on_ui_update_trigger_update_all,
         inputs=all_inputs_for_update,
         outputs=[*update_outputs_list,
                  *transparency_controls],
@@ -4494,7 +4772,9 @@ with common.GRADIO_ROOT:
         height_slider,
         mirror_chk,
         flip_vertical_chk,
-        flip_AR_chk
+        flip_AR_chk,
+        output_width,
+        output_height
     ]
 
     reset_transforms_btn.click(
@@ -4502,6 +4782,10 @@ with common.GRADIO_ROOT:
         inputs=input_image_display,
         outputs=[*all_transform_outputs,
                  *transparency_controls]
+    ).then(
+        fn=reset_last_angle,
+        outputs=last_rotate_angle,
+        show_progress=False, queue=False
     ).then(
         fn=on_ui_update_trigger,
         inputs=all_inputs_for_update,
@@ -4755,6 +5039,10 @@ with common.GRADIO_ROOT:
         outputs=[*all_reset_outputs,
                  *transparency_controls]
     ).then(
+        fn=reset_last_angle,
+        outputs=last_rotate_angle,
+        show_progress=False, queue=False
+    ).then(
         # rerun the main processing function with the new default inputs:
         on_ui_update_trigger,
         inputs=all_inputs_for_update,
@@ -4792,6 +5080,10 @@ with common.GRADIO_ROOT:
         outputs=[original_image_state, output_image_display,
             output_image_state, output_transparency_state]
     ).then(
+        fn=reset_last_angle,
+        outputs=last_rotate_angle,
+        show_progress=False, queue=False
+    ).then(
         fn=edit.reset_to_defaults,
         inputs=[input_image_display],
         outputs=[*all_reset_outputs,
@@ -4807,6 +5099,10 @@ with common.GRADIO_ROOT:
         inputs=[input_image_display],
         outputs=[output_image_state, output_image_display,
             output_image_state, output_transparency_state]
+    ).then(
+        fn=reset_last_angle,
+        outputs=last_rotate_angle,
+        show_progress=False, queue=False
     ).then(
         fn=edit.reset_to_defaults,
         inputs=[input_image_display],
@@ -5743,6 +6039,8 @@ with common.GRADIO_ROOT:
             iclight_row_shield,
             gateway_info_markdown,
             btn_gateway,
+            comfy_sdxl,
+            comfy_help_col,
             category_selection,
             preset_selection,
             clear_favorites_button,
@@ -5808,6 +6106,23 @@ with common.GRADIO_ROOT:
                 result.append(gr.update())
         return result
 
+    def sync_comfy_controls():
+        is_comfy = bool(common.default_engine) or getattr(config, 'default_comfy_sdxl_checkbox', False)
+        return (
+            gr.update(visible=not is_comfy),  # sharpness
+            gr.update(visible=not is_comfy),  # seamless_tiling_checkbox
+            gr.update(visible=not is_comfy)   # seamless_tiling_help_link
+        )
+
+    def sync_input_panels_with_active_engine(
+        is_input_image_checked):
+        is_comfy = bool(common.default_engine) or getattr(config, 'default_comfy_sdxl_checkbox', False)
+        show_fooocus = is_input_image_checked and not is_comfy
+        show_comfy = is_input_image_checked and is_comfy
+        return gr.update(visible=show_fooocus), gr.update(visible=show_comfy)
+
+    def sync_metadata_comfy_sdxl():
+        return gr.update(value=config.default_comfy_sdxl_checkbox)
 
     # Register click handlers for each preset bar button
     for i in range(config.preset_bar_length):
@@ -5817,6 +6132,19 @@ with common.GRADIO_ROOT:
             outputs=[state_topbar, category_selection, preset_selection]
         ).then(
             UIS.reset_layout_params, inputs=reset_preset_inputs, outputs=reset_layout_params, show_progress=False
+        ).then(
+            # swap input image panels if required
+            fn=sync_input_panels_with_active_engine,
+            inputs=[input_image_checkbox],
+            outputs=[image_input_panel, comfy_input_panel],
+            show_progress=False, queue=False
+        ).then(
+            fn=sync_comfy_controls,
+            inputs=None,
+            outputs=[sharpness,
+                seamless_tiling_checkbox,
+                seamless_tiling_help_link],
+            show_progress=False, queue=False
         ).then(
             fn=lambda x: x,
             inputs=state_topbar,
@@ -5836,6 +6164,36 @@ with common.GRADIO_ROOT:
             queue=False, show_progress=False
         )
 
+
+    def comfy_sdxl_change(arg_sdxl, is_input_image_checked):
+        config.default_comfy_sdxl_checkbox = arg_sdxl
+        is_comfy = bool(common.default_engine) or config.default_comfy_sdxl_checkbox
+        show_fooocus = is_input_image_checked and not is_comfy
+        show_comfy = is_input_image_checked and is_comfy
+        return (
+            gr.update(value=arg_sdxl),
+            gr.update(visible=show_fooocus),
+            gr.update(visible=show_comfy),
+            gr.update(visible=not is_comfy),  # sharpness
+            gr.update(visible=not is_comfy),  # seamless_tiling_checkbox
+            gr.update(visible=not is_comfy)   # seamless_tiling_help_link
+        )
+
+    comfy_sdxl.change(
+        fn=comfy_sdxl_change,
+        inputs=[comfy_sdxl, input_image_checkbox],
+        outputs=[
+            comfy_sdxl,
+            image_input_panel,
+            comfy_input_panel,
+            sharpness,
+            seamless_tiling_checkbox,
+            seamless_tiling_help_link
+        ],
+        queue=False,
+        show_progress=False
+    )
+
     # Register the global dropdown handlers
     category_selection.change(
         PR.set_category_selection,
@@ -5844,7 +6202,6 @@ with common.GRADIO_ROOT:
             preset_selection, preset_info],
         show_progress=False, queue=False
     )
-
 
     def auto_finalize_metadata_load(state_is_generating, state_params, inpaint_mode):
         # Only act if we are in a metadata load sequence
@@ -5873,6 +6230,27 @@ with common.GRADIO_ROOT:
         outputs=reset_preset_layout + reset_preset_func + load_data_outputs,
         queue=False, show_progress=False
     ).then(
+        # Synchronize SDXL Comfy Mode checkbox
+        # from imported metadata
+        fn=sync_metadata_comfy_sdxl,
+        inputs=None,
+        outputs=[comfy_sdxl],
+        show_progress=False, queue=False
+    ).then(
+        # Dynamically sync image input panels
+        # to match the imported engine
+        fn=sync_input_panels_with_active_engine,
+        inputs=[input_image_checkbox],
+        outputs=[image_input_panel, comfy_input_panel],
+        show_progress=False, queue=False
+    ).then(
+        fn=sync_comfy_controls,
+        inputs=None,
+        outputs=[sharpness,
+            seamless_tiling_checkbox,
+            seamless_tiling_help_link],
+        show_progress=False, queue=False
+    ).then(
         fn=style_sorter.sort_styles,
         inputs=style_selections, outputs=style_selections,
         queue=False, show_progress=False
@@ -5881,14 +6259,6 @@ with common.GRADIO_ROOT:
         inputs=None, outputs=None,
         queue=False, show_progress=False
     )
-
-
-    def sync_input_panels_with_active_engine(
-        is_input_image_checked):
-        is_comfy = bool(common.default_engine)
-        show_fooocus = is_input_image_checked and not is_comfy
-        show_comfy = is_input_image_checked and is_comfy
-        return gr.update(visible=show_fooocus), gr.update(visible=show_comfy)
 
 
     preset_selection.change(
@@ -5906,7 +6276,8 @@ with common.GRADIO_ROOT:
             overwrite_step,
             lora_warning,
             guidance_scale,
-            vae_sharpness],
+            vae_sharpness,
+            comfy_auto_upscale],
         show_progress=False, queue=False
     ).then(
         UIS.reset_layout_params, inputs=reset_preset_inputs,
@@ -5917,6 +6288,13 @@ with common.GRADIO_ROOT:
         fn=sync_input_panels_with_active_engine,
         inputs=[input_image_checkbox],
         outputs=[image_input_panel, comfy_input_panel],
+        show_progress=False, queue=False
+    ).then(
+        fn=sync_comfy_controls,
+        inputs=None,
+        outputs=[sharpness,
+            seamless_tiling_checkbox,
+            seamless_tiling_help_link],
         show_progress=False, queue=False
     ).then(
         fn=lambda x: x,
@@ -5936,6 +6314,33 @@ with common.GRADIO_ROOT:
     )
 
 
+    def sync_ui_to_config(
+        pos_prompt, neg_prompt, sampler_val, scheduler_val,
+        vae_val, substyle_val, performance_val, cfg_val,
+        steps_val, clip_skip_val, adaptive_cfg_val
+    ):
+        config.default_prompt = pos_prompt if isinstance(pos_prompt, str) else ''
+        config.default_prompt_negative = neg_prompt if isinstance(neg_prompt, str) else ''
+        if sampler_val:
+            config.default_sampler = sampler_val
+        if scheduler_val:
+            config.default_scheduler = scheduler_val
+        if vae_val:
+            common.current_vae = vae_val
+        if substyle_val:
+            config.v2_substyle = substyle_val
+        if performance_val:
+            common.performance_selection = performance_val
+        if cfg_val is not None:
+            config.default_cfg_scale = float(cfg_val)
+        if steps_val is not None:
+            config.default_overwrite_step = int(steps_val)
+        if clip_skip_val is not None:
+            config.default_clip_skip = int(clip_skip_val)
+        if adaptive_cfg_val is not None:
+            config.default_cfg_tsnr = float(adaptive_cfg_val)
+        return
+
     # stop ".then chain" early
     # should_stop_flag = gr.State(value=False)
     generate_button.click(
@@ -5947,6 +6352,17 @@ with common.GRADIO_ROOT:
         outputs=None,
         queue=False, show_progress=False,
         _js='()=>{window.close_finished_images_catalog();}'
+    ).then(
+        fn=sync_ui_to_config,
+        inputs=[
+            prompt, negative_prompt,
+            sampler_selector, scheduler_selector,
+            vae_name, v2_substyle,
+            performance_selection, guidance_scale,
+            overwrite_step, clip_skip, adaptive_cfg
+        ],
+        outputs=None,
+        queue=False
     ).then(
         fn=UIS.manage_image_buffers,
         inputs=[inpaint_input_image, inpaint_mask_image],

@@ -93,18 +93,29 @@ def switch_layout_template(presetdata: dict | str, state_params, preset_url=''):
     base_model_list = loader.get_base_model_list(template_engine, task_method)
 
     results = [params_backend]
-    results.append(get_layout_visible_inter('performance_selection', visible, inter))
-    results.append(get_layout_choices_visible_inter(sampler_list, 'sampler_name', visible, inter))
-    results.append(get_layout_choices_visible_inter(scheduler_list, 'scheduler_name', visible, inter))
-    results.append(get_layout_toggle_visible_inter('input_image_checkbox', visible, inter))
-    results.append(get_layout_toggle_visible_inter('enhance_checkbox', visible, inter))
-    results.append(get_layout_choices_visible_inter(base_model_list, 'base_model', visible, inter))
-    results.append(get_layout_visible_inter('refiner_model', visible, inter))
-    results.append(get_layout_visible_inter('overwrite_step', visible, inter))
-    results.append(get_layout_visible_inter('guidance_scale', visible, inter))
+    results.append(
+        get_layout_visible_inter('performance_selection', visible, inter))
+    results.append(
+        get_layout_choices_visible_inter(sampler_list, 'sampler_name', visible, inter))
+    results.append(
+        get_layout_choices_visible_inter(scheduler_list, 'scheduler_name', visible, inter))
+    results.append(
+        gr.update(interactive=True))
+    results.append(
+        get_layout_toggle_visible_inter('enhance_checkbox', visible, inter))
+    results.append(
+        get_layout_choices_visible_inter(base_model_list, 'base_model', visible, inter))
+    results.append(
+        get_layout_visible_inter('refiner_model', visible, inter))
+    results.append(
+        get_layout_visible_inter('overwrite_step', visible, inter))
+    results.append(
+        get_layout_visible_inter('guidance_scale', visible, inter))
 
-    results.append(get_layout_visible_inter('sharpness', visible, inter))
-    results.append(get_layout_empty_visible_inter('negative_prompt', visible, inter))
+    results.append(
+        get_layout_visible_inter('sharpness', visible, inter))
+    results.append(
+        get_layout_empty_visible_inter('negative_prompt', visible, inter))
 
     # Force the obsolete help iFrame to remain hidden.
     # This prevents layout shifting
@@ -114,16 +125,28 @@ def switch_layout_template(presetdata: dict | str, state_params, preset_url=''):
     #for i in range(config.default_max_lora_number):
     #    results += [get_layout_visible_inter('loras', visible, inter)] * 3
 
-    #[output_format, inpaint_advanced_masking_checkbox, mixing_image_prompt_and_vary_upscale, mixing_image_prompt_and_inpaint, backfill_prompt, input_image_checkbox, state_topbar]
-    # if default_X in config_preset then update the value to gr.X else update with default value in config
+    # [output_format, inpaint_advanced_masking_checkbox,
+    # mixing_image_prompt_and_vary_upscale,
+    # mixing_image_prompt_and_inpaint, backfill_prompt,
+    # input_image_checkbox, state_topbar]
+    # if default_X in config_preset then update the value
+    # to gr.X else update with default value in config
     update_value_if_existed = lambda x: gr.update() if x not in presetdata_dict else presetdata_dict[x]
     results.append(update_value_if_existed("output_format"))
-    results.append(update_value_if_existed("inpaint_advanced_masking_checkbox"))
-    results.append(update_value_if_existed("mixing_image_prompt_and_vary_upscale"))
-    results.append(update_value_if_existed("mixing_image_prompt_and_inpaint"))
-    results.append(update_value_if_existed("backfill_prompt"))
-    results.append(update_value_if_existed("translation_methods"))
-    results.append(False if template_engine not in ['Fooocus', 'Comfy'] else update_value_if_existed("input_image_checkbox"))
+    results.append(
+        update_value_if_existed(
+        "inpaint_advanced_masking_checkbox"))
+    results.append(
+        update_value_if_existed( "mixing_image_prompt_and_vary_upscale"))
+    results.append(
+        update_value_if_existed("mixing_image_prompt_and_inpaint"))
+    results.append(
+        update_value_if_existed("backfill_prompt"))
+    results.append(
+        update_value_if_existed("translation_methods"))
+    # input_image_checkbox is active across all engines
+    results.append(
+        update_value_if_existed("input_image_checkbox"))
     if 'image_catalog_max_number' in presetdata_dict:
         state_params.update({'__max_catalog': presetdata_dict['image_catalog_max_number']})
     results.append(state_params)
@@ -249,9 +272,13 @@ def process_dictionary(loaded_parameter_dict, is_generating, inpaint_mode, resul
     get_str('negative_prompt', 'Negative Prompt', loaded_parameter_dict, results)
 
     get_list('styles', 'Styles', loaded_parameter_dict, results)
-    get_str('v2_substyle', 'Substyle', loaded_parameter_dict, results)
+    substyle_val = get_str('v2_substyle', 'Substyle', loaded_parameter_dict, results)
+    if substyle_val:
+        config.v2_substyle = substyle_val
 
     performance = get_str('performance', 'Performance', loaded_parameter_dict, results)
+    if performance:
+        common.performance_selection = performance
     get_steps('steps', 'Steps', loaded_parameter_dict, results)
     get_number('overwrite_switch', 'Overwrite Switch', loaded_parameter_dict, results)
     get_resolution('resolution', 'Resolution', loaded_parameter_dict, results)
@@ -276,14 +303,14 @@ def process_dictionary(loaded_parameter_dict, is_generating, inpaint_mode, resul
     get_str('base_model', 'Base Model', loaded_parameter_dict, results)
     get_str('refiner_model', 'Refiner Model', loaded_parameter_dict, results)
     get_number('refiner_switch', 'Refiner Switch', loaded_parameter_dict, results)
-    get_str('sampler', 'Sampler', loaded_parameter_dict, results)
-    arg_sampler = loaded_parameter_dict.get("sampler")
-    if arg_sampler:
-        verify_sampler(arg_sampler)
-    get_str('scheduler', 'Scheduler', loaded_parameter_dict, results)
-    arg_scheduler = loaded_parameter_dict.get("scheduler")
-    if arg_scheduler:
-        verify_scheduler(arg_scheduler)
+
+    sampler_val = get_str('sampler', 'Sampler', loaded_parameter_dict, results)
+    if sampler_val:
+        verify_sampler(sampler_val)
+    scheduler_val = get_str('scheduler', 'Scheduler', loaded_parameter_dict, results)
+    if scheduler_val:
+        verify_scheduler(scheduler_val)
+
     get_vae('vae', 'VAE', loaded_parameter_dict, results)
     get_vae_sharpness(loaded_parameter_dict, results)
     get_seed('seed', 'Seed', loaded_parameter_dict, results)
@@ -556,12 +583,14 @@ def get_vae(key: str, fallback: str | None, source_dict: dict, results: list, de
                 h = choice
                 break
 
+        common.current_vae = h
         results.append(gr.update(choices=vae_choices, value=h))
         return h
 
     except Exception as e:
         safe_engine = raw_engine if 'raw_engine' in locals() and raw_engine else 'Fooocus'
         current_vaes = loader.get_vae_list(safe_engine)
+        common.current_vae = default_vae
         results.append(gr.update(choices=[default_vae] + current_vaes, value=default_vae))
         return default_vae
 
@@ -682,8 +711,10 @@ def get_seed(key: str, fallback: str | None, source_dict: dict, results: list, d
         h = source_dict.get(key, source_dict.get(fallback, default))
         assert h is not None
         h = int(h)
+        common.saved_seed = str(h)
+        common.image_seed = str(h)
         results.append(False)
-        results.append(h)
+        results.append(str(h))
     except:
         results.append(gr.update())
         results.append(gr.update())
@@ -1450,6 +1481,9 @@ def transform_log_metadata(raw_prompt_txt):
     except:
         seed_val = -1
     use_random_seed = (seed_val == -1)
+    if not use_random_seed:
+        common.saved_seed = str(seed_val)
+        common.image_seed = str(seed_val)
 
     # 6. Resolution / Aspect Ratio
     # (Gradio UI-Compatible String)
@@ -1567,6 +1601,9 @@ def transform_toolbox_image(state_params):
     except:
         seed_val = -1
     use_random_seed = (seed_val == -1)
+    if not use_random_seed:
+        common.saved_seed = str(seed_val)
+        common.image_seed = str(seed_val)
 
     # 6. Resolution / Aspect Ratio
     # (Gradio UI-Compatible String)
@@ -1677,6 +1714,9 @@ def transform_params_by_meta(file_path):
     except:
         seed_val = -1
     use_random_seed = (seed_val == -1)
+    if not use_random_seed:
+        common.saved_seed = str(seed_val)
+        common.image_seed = str(seed_val)
 
     # 6. Resolution / Aspect Ratio
     # (Gradio UI-Compatible String)
@@ -1874,6 +1914,35 @@ def reset_params_by_meta(metadata, state_params, is_generating, inpaint_mode):
 
     # 2. Run the Parser (now restored with safe_get)
     parsed_parameters = metadata_parser.to_json(metadata)
+
+    # --- Sync common.default_engine on metadata import ---
+    engine_data = parsed_parameters.get(
+        'default_engine', parsed_parameters.get('engine', {}))
+    if isinstance(engine_data, dict) and engine_data.get('backend_engine') not in ['Fooocus', 'SDXL-Fooocus', None, '']:
+        common.default_engine = engine_data
+        config.backend_engine = ''
+    else:
+        common.default_engine = {}
+        config.backend_engine = getattr(config, 'default_engine', {}).get('backend_engine', 'Fooocus')
+    # ------------------------------------------------------
+
+    # Sync SDXL Comfy mode state from metadata:
+    # Gatekeeper for "SDXL in Comfy Mode" checkbox
+    backend_engine_val = str(parsed_parameters.get('Backend Engine', parsed_parameters.get('backend_engine', ''))).strip()
+    raw_workflow = parsed_parameters.get('Workflow', parsed_parameters.get('task_method', None))
+    workflow_val = str(raw_workflow).strip() if raw_workflow is not None else None
+
+    is_sdxl_comfy_engine = (backend_engine_val == 'SDXL-Comfy')
+    is_dedicated_workflow = bool(common.default_engine) or (workflow_val is not None and 'gguf' in workflow_val.lower())
+    is_standard_or_legacy = (workflow_val in ['sdxl_base', 'None', '', None])
+
+    # Enable comfy_sdxl only for standard SDXL presets
+    # use Comfy mode or legacy images without workflows
+    if is_sdxl_comfy_engine and not is_dedicated_workflow and is_standard_or_legacy:
+        config.default_comfy_sdxl_checkbox = True
+    else:
+        config.default_comfy_sdxl_checkbox = False
+
 
     # 3. Synchronize UI
     results = switch_layout_template(parsed_parameters, state_params)

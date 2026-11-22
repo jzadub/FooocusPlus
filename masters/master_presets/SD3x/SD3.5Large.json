@@ -2,7 +2,7 @@
     "default_engine": {
     	"backend_engine": "SD3x",
         "disvisible": ["backend_selection", "performance_selection", "refiner_model", "sharpness"],
-		"disinteractive": ["enhance_checkbox", "input_image_checkbox", "refiner_model"],
+		"disinteractive": ["enhance_checkbox"],
         "backend_params": {
             "task_method": "sd3x_base"
         }

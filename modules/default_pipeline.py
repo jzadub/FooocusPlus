@@ -177,8 +177,9 @@ def refresh_base_model(name, vae_name=None):
     if vae_filename is None and not has_embedded_vae(filename):
         target_vae = 'sdxl_vae.safetensors'
         vae_disk_path = Path(common.path_vae) / target_vae
+        sdxl_vae_url = 'https://huggingface.co/stabilityai/sdxl-vae/resolve/main/sdxl_vae.safetensors'
 
-        if not vae_disk_path.is_file():
+        if not loader.is_file_complete(vae_disk_path, sdxl_vae_url):
             interpret('[Pipeline] Downloading fallback SDXL VAE...')
             loader.download_sdxl_vae()
 

@@ -1,0 +1,67 @@
+{
+    "default_engine": {
+        "backend_engine": "Flux",
+        "disvisible": ["backend_selection", "negative_prompt", "performance_selection", "refiner_model", "sharpness"],
+        "disinteractive": ["enhance_checkbox"],
+        "backend_params": {
+            "task_method": "krea2_turbo_gguf",
+            "clip_model": "qwen3vl_4b_fp8_scaled.safetensors"
+        }
+    },
+    "default_model": "Krea2/krea2_turbo-Q4_K_M.gguf",
+    "default_refiner": "None",
+    "default_refiner_switch": 1.0,
+    "default_loras": [
+        [
+            false,
+            "Krea2/Detailer-KREA2.safetensors",
+            1.0
+        ],
+        [
+            false,
+            "Krea2/WarmLightSlider-KREA2_v1.safetensors",
+            1.0
+        ],
+        [
+            true,
+            "None",
+            1.0
+        ],
+        [
+            true,
+            "None",
+            1.0
+        ],
+        [
+            true,
+            "None",
+            1.0
+        ]
+    ],
+    "default_cfg_scale": 1.0,
+    "default_sample_sharpness": 2,
+    "default_sampler": "euler",
+    "default_scheduler": "simple",
+    "default_vae": "hdrVAEAnimaKrea2QWEN_bf16.safetensors",
+    "default_vae_sharpness": 0.0,
+    "default_clip_skip": 1,
+    "default_performance": "",
+    "default_prompt": "",
+    "default_styles": [
+        "Fooocus V2"
+    ],
+    "v2_substyle": "Unlit",
+    "default_aspect_ratio": "0*0",
+    "default_overwrite_step": 8,
+    "checkpoint_downloads": {
+        "Krea2/krea2_turbo-Q4_K_M.gguf": "https://huggingface.co/vantagewithai/Krea-2-Turbo-GGUF/resolve/main/krea2_turbo-Q4_K_M.gguf"
+    },
+    "clip_downloads": {
+        "qwen3vl_4b_fp8_scaled.safetensors": "https://huggingface.co/Comfy-Org/Krea-2/resolve/main/text_encoders/qwen3vl_4b_fp8_scaled.safetensors"
+    },
+    "embeddings_downloads": {},
+    "lora_downloads": {
+        "Krea2/Detailer-KREA2.safetensors": "https://huggingface.co/DavidDragonsage/FooocusPlus/resolve/main/support/LoRAs/Detailer-KREA2.safetensors",
+        "Krea2/WarmLightSlider-KREA2_v1.safetensors": "https://huggingface.co/DavidDragonsage/FooocusPlus/resolve/main/support/LoRAs/WarmLightSlider-KREA2_v1.safetensors"
+    }
+}

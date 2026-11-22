@@ -1,15 +1,23 @@
+import copy
+import numpy as np
+import re
 import threading
+
 import args_manager
 import common
-import copy
-import re
 import modules.config as config
 import modules.flags as flags
 import modules.loader as loader
 import modules.util as util
+from modules.ar_util import AR_split
 from enhanced.translator import interpret, \
     interpret_warn, render
 from extras.inpaint_mask import generate_mask_from_image, SAMOptions
+
+from modules.meta_parser import \
+    get_metadata_parser, parse_log_text_to_dict, \
+    read_meta_from_image
+
 from modules.patch import PatchSettings, patch_settings, patch_all
 from pathlib import Path
 
@@ -26,8 +34,27 @@ def build_image_type(async_task, base_type, update_global=True):
     global _image_type
     final_type = base_type
 
+    if base_type == 'Comfy Upscale':
+        factor = getattr(async_task, 'comfy_upscale_factor', 2.0)
+        if getattr(async_task, 'comfy_fast_upscale', False):
+            final_type = f'Comfy Fast Upscale ({factor}x)'
+        else:
+            denoise = getattr(async_task, 'comfy_upscale_denoise', 0.25)
+            final_type = f'Comfy Ultimate SD Upscale ({factor}x, Denoise: {denoise})'
+
+    elif getattr(async_task, 'is_comfy_auto_upscale', False):
+        factor = getattr(async_task, 'comfy_upscale_factor', 2.0)
+        if getattr(async_task, 'comfy_fast_upscale', False):
+            tag = f'with Fast Auto-Upscale ({factor}x)'
+        else:
+            denoise = getattr(async_task, 'comfy_upscale_denoise', 0.25)
+            tag = f'with Auto-Upscale ({factor}x, Denoise: {denoise})'
+
+        if tag not in final_type:
+            final_type = f'{final_type} {tag}'
+
     # Refine IC-Light
-    if base_type == 'IC-Light':
+    elif base_type == 'IC-Light':
         source = getattr(async_task, 'iclight_source_radio', [])
         if source:
             final_type = f'IC-Light ({source})'
@@ -171,9 +198,14 @@ class AsyncTask:
 
         self.input_image_checkbox = config.default_input_image_checkbox
         if self.input_image_checkbox:
-            self.current_tab = common.current_tab_name
+            # if in Comfy mode:
+            if common.default_engine:
+                self.current_tab = getattr(common, 'comfy_input_tab_name', 'comfy_upscale')
+            else:
+                self.current_tab = common.current_tab_name
         else:
             self.current_tab = ''
+
         self.uov_method = config.default_uov_method
         self.uov_input_image = common.uov_image_buffer.copy() if common.uov_image_buffer is not None else None
 
@@ -208,14 +240,6 @@ class AsyncTask:
                 interpret_warn('Inpaint Auto-Masking failed!')
                 interpret('Please try restarting', 'FooocusPlus')
                 interpret('but also make a bug report at GitHub or the Pure Fooocus Facebook group.')
-
-        self.layer_method = 'Blend the Foreground with IC-Light'
-        self.layer_input_image = common.layer_image_buffer.copy() if common.layer_image_buffer is not None else None
-
-        self.iclight_enable = common.features_tab_name == 'layer' and common.features_checkbox and is_valid_image(common.layer_image_buffer)
-        if self.iclight_enable:
-            interpret('[Worker] IC-Light enabled')
-        self.iclight_source_radio = common.iclight_source_radio
 
         self.disable_preview = common.disable_preview
         self.disable_seed_increment = common.disable_seed_increment
@@ -371,17 +395,98 @@ class AsyncTask:
         self.enhance_stats = {}
 
         # print(f'params_backend:{self.params_backend}')
+
+        # Use SDXL in Fooocus mode or Comfy mode
         self.task_class = self.params_backend.pop('backend_engine', 'Fooocus')
         self.task_name = self.params_backend.pop('preset', 'Default')
         self.task_method = self.params_backend.pop('task_method', 'text2image')
         if common.default_engine:
-            self.task_class = common.default_engine.get("backend_engine")
-            self.task_method = common.default_engine.get("backend_params", {}).get("task_method")
+            self.task_class = common.default_engine.get('backend_engine')
+            self.task_method = common.default_engine.get('backend_params', {}).get('task_method')
+        elif getattr(config, 'default_comfy_sdxl_checkbox', False):
+            # Route SDXL presets into Comfy mode
+            interpret('Generating SDXL compatible models in Comfy mode')
+            self.task_class = 'Comfy'
+            model_name_lower = str(self.base_model_name).lower()
+            if '.gguf' in model_name_lower:
+                if 'pony' in model_name_lower:
+                    self.task_method = 'sdxl_pony_gguf'
+                else:
+                    self.task_method = 'sdxl_base_gguf'
+            else:
+                self.task_method = 'sdxl_base'
+
         #print(f'task_class={self.task_class}, task_name={self.task_name}, task_method={self.task_method}')
+
+        self.layer_method = 'Blend the Foreground with IC-Light'
+        self.layer_input_image = common.layer_image_buffer.copy() if common.layer_image_buffer is not None else None
+
+        self.iclight_enable = common.features_tab_name == 'layer' and common.features_checkbox and is_valid_image(common.layer_image_buffer)
+        if self.iclight_enable:
+            interpret('[Worker] IC-Light enabled')
+        self.iclight_source_radio = common.iclight_source_radio
+
         if self.iclight_enable:
             self.task_class = 'Comfy'
             self.task_name = 'default'
             self.task_method = self.layer_method
+
+
+        # Comfy Upscale Image buffer capture
+        self.comfy_upscale_image = common.comfy_upscale_image_buffer.copy() if common.comfy_upscale_image_buffer is not None else None
+        self.comfy_upscale_factor = getattr(common, 'comfy_upscale_factor', 2.0)
+        self.comfy_upscale_denoise = getattr(common, 'comfy_upscale_denoise', 0.25)
+
+        self.comfy_auto_upscale = getattr(common, 'comfy_auto_upscale', False)
+        self.comfy_fast_upscale = getattr(common, 'comfy_fast_upscale', False)
+
+        # Route task engine if Comfy Upscale is selected
+        self.is_comfy_upscale = (
+            common.comfy_active and
+            self.input_image_checkbox and
+            self.current_tab == 'comfy_upscale' and
+            self.comfy_upscale_image is not None and
+            not self.comfy_auto_upscale
+        )
+
+        self.is_comfy_auto_upscale = (
+            common.comfy_active and
+            self.comfy_auto_upscale and
+            not self.is_comfy_upscale
+        )
+
+        if self.is_comfy_upscale:
+            self.iclight_enable = False
+
+            # Calculate and store clean dimensional reporting
+            if self.comfy_upscale_image is not None and isinstance(self.comfy_upscale_image, np.ndarray):
+                self.orig_h, self.orig_w = self.comfy_upscale_image.shape[:2]
+                target_w = int(self.orig_w * self.comfy_upscale_factor)
+                target_h = int(self.orig_h * self.comfy_upscale_factor)
+
+                # Leverage native Fooocus override mechanism
+                self.overwrite_width = target_w
+                self.overwrite_height = target_h
+                self.aspect_ratios_selection = f'{target_w}×{target_h}'
+
+                interpret('[Worker] Input Image size:', f'{self.orig_w}×{self.orig_h}')
+                interpret('[Worker] Upscale target size:', f'{target_w}×{target_h} ({self.comfy_upscale_factor}x)')
+            else:
+                self.orig_w, self.orig_h = 0, 0
+
+        if self.is_comfy_auto_upscale:
+            # Calculate target upscale dimensions for
+            # standard text2image generation
+            base_w, base_h = AR_split(self.aspect_ratios_selection)
+            self.orig_w, self.orig_h = int(base_w), int(base_h)
+            self.upscale_target_w = int(self.orig_w * self.comfy_upscale_factor)
+            self.upscale_target_h = int(self.orig_h * self.comfy_upscale_factor)
+
+            interpret('[Worker] Generated Image size:', f'{self.orig_w}×{self.orig_h}')
+            interpret('[Worker] Auto-Upscale target size:', f'{self.upscale_target_w}×{self.upscale_target_h} ({self.comfy_upscale_factor}x)')
+
+        # Update full class name AFTER
+        # any potential task_class override
         self.task_class_full = task_class_mapping[self.task_class]
 
         if self.task_class in ['Kolors+', 'Flux', 'HyDiT+', 'SD3x'] and self.task_name not in ['Kolors+', 'Flux', 'HyDiT+', 'SD3x']:
@@ -399,7 +504,7 @@ class AsyncTask:
             'iclight_enable': self.iclight_enable,
             'iclight_source_radio': self.iclight_source_radio,
             }
-        if self.task_name == 'default' and self.task_class == 'Comfy':
+        if self.task_name == 'default' and self.task_class == 'Comfy' and self.iclight_enable:
             self.params_backend.update({"ui_options": ui_options})
 
         self.inpaint_mode = getattr(common, 'inpaint_mode', 'Inpaint Modify/Replace')
@@ -408,7 +513,9 @@ class AsyncTask:
 
         # Determine the initial base Image Type
         # based on frozen parameters
-        if self.iclight_enable:
+        if getattr(self, 'is_comfy_upscale', False):
+            base_type = 'Comfy Upscale'
+        elif self.iclight_enable:
             base_type = 'IC-Light'
         elif self.current_tab == 'uov' and self.uov_input_image is not None:
             base_type = "Upscale or Variation"
@@ -440,7 +547,6 @@ def worker():
     import os
     import traceback
     import math
-    import numpy as np
     import torch
     import time
     import random
@@ -457,20 +563,20 @@ def worker():
     import enhanced.version as version
 
     from datetime import datetime
+
+    from enhanced.backend import comfyd, comfyclient_pipeline as comfypipeline
+    from backend_base.comfy_task import get_comfy_task, default_kolors_base_model_name
     from extras.censor import default_censor
-    from modules.ar_util import AR_split
-    from modules.sdxl_styles import apply_style, get_random_style, fooocus_expansion, apply_arrays, random_style_name
-    from modules.private_logger import log
     from extras.expansion import safe_str
-    from modules.util import (remove_empty_str, HWC3, resize_image,
+    from modules.flags import Performance
+    from modules.private_logger import log
+    from modules.sdxl_styles import apply_style, get_random_style, fooocus_expansion, apply_arrays, random_style_name
+    from modules.upscaler import perform_upscale, execute_fast_upscale
+    from modules.util import (remove_empty_str,
+        HWC3, resize_image,
         get_image_shape_ceil, set_image_shape_ceil,
         get_shape_ceil, resample_image, erode_or_dilate,
         parse_lora_references_from_prompt, apply_wildcards)
-    from modules.upscaler import perform_upscale
-    from modules.flags import Performance
-    from modules.meta_parser import get_metadata_parser
-    from enhanced.backend import comfyd, comfyclient_pipeline as comfypipeline
-    from enhanced.comfy_task import get_comfy_task, default_kolors_base_model_name
 
     pid = os.getpid()
     print()
@@ -506,6 +612,33 @@ def worker():
         return
 
 
+    def build_clean_positive_parts(task, use_expansion):
+        base_pos_parts = []
+        for item in task['positive']:
+            if isinstance(item, str) and item.strip():
+                base_pos_parts.append(item)
+            else:
+                continue
+
+        expansion_text = task.get('expansion', '')
+        task_prompt_text = task.get('task_prompt', '').strip()
+
+        if use_expansion and expansion_text and base_pos_parts and base_pos_parts[-1] == expansion_text:
+            pos_parts = base_pos_parts[:-1]
+            clean_expansion = expansion_text.strip()
+            if task_prompt_text and clean_expansion.startswith(task_prompt_text):
+                clean_expansion = clean_expansion[len(task_prompt_text):].lstrip(' ,')
+            elif task_prompt_text:
+                stripped_prompt = task_prompt_text.rstrip(' ,.')
+                if stripped_prompt and clean_expansion.startswith(stripped_prompt):
+                    clean_expansion = clean_expansion[len(stripped_prompt):].lstrip(' ,.')
+            if clean_expansion:
+                pos_parts.append(clean_expansion)
+            return pos_parts
+        else:
+            return base_pos_parts
+
+
     def process_task(all_steps,
         async_task, callback, controlnet_canny_path, controlnet_cpds_path, current_task_id,
         denoising_strength, final_scheduler_name, goals, initial_latent, steps, switch, positive_cond,
@@ -514,14 +647,41 @@ def worker():
 
         # Introduce Fooocus V2 support to Comfy:
         # combine the styled prompt and
-        # the prompt expansion cleanly
-        combined_positive = ", ".join([x for x in task["positive"] if isinstance(x, str) and x.strip()])
-        combined_negative = ", ".join([x for x in task["negative"] if isinstance(x, str) and x.strip()])
+        # the prompt expansion cleanly without duplicating task_prompt
+        combined_positive = ', '.join(build_clean_positive_parts(task, use_expansion))
+
+        base_neg_parts = []
+        for item in task['negative']:
+            if isinstance(item, str) and item.strip():
+                base_neg_parts.append(item)
+            else:
+                continue
+        combined_negative = ', '.join(base_neg_parts)
 
         if async_task.last_stop is not False:
             model_management.interrupt_current_processing()
 
         if async_task.task_class in flags.comfy_classes:
+            # --- FAST CANVAS UPSCALE (Bypasses Comfy, completes in ~1.5s) ---
+            if getattr(async_task, 'is_comfy_upscale', False) and getattr(async_task, 'comfy_fast_upscale', False):
+
+                progressbar(async_task, 30, 'Running Comfy Fast Upscale...')
+                fast_img = execute_fast_upscale(async_task.comfy_upscale_image, async_task.comfy_upscale_factor)
+                imgs = [fast_img]
+                height, width = fast_img.shape[:2]
+
+                current_progress = int(base_progress + (100 - preparation_steps) / float(all_steps) * steps)
+                img_paths, grid_metadata = save_and_log(async_task, height, imgs, task, use_expansion, width, loras, persist_image)
+                yield_result(async_task, img_paths, current_progress, async_task.black_out_nsfw, False,
+                    do_not_show_finished_images=not show_intermediate_results)
+                return imgs, img_paths, current_progress
+            # -------------------------------------
+
+            is_canvas_upscale = getattr(async_task, 'is_comfy_upscale', False)
+            is_auto_upscale = getattr(async_task, 'is_comfy_auto_upscale', False) and not getattr(async_task, 'comfy_fast_upscale', False)
+
+            # Standard parameters
+            # for all generations
             default_params = dict(
                 prompt=combined_positive,
                 negative_prompt=combined_negative,
@@ -532,21 +692,46 @@ def worker():
                 scheduler=final_scheduler_name,
                 cfg_scale=async_task.cfg_scale,
                 steps=steps,
-                denoise=denoising_strength,
+                denoise=async_task.comfy_upscale_denoise if is_canvas_upscale else denoising_strength,
+                workflow_name=async_task.task_method,
                 seed=task['task_seed'],
                 vae_name=getattr(async_task, 'vae_name', None),
                 vae_sharpness=getattr(async_task, 'vae_sharpness', 0.0)
-                )
+            )
+            # Only append upscale parameters if a
+            # diffusion upscale is occurring
+            if is_canvas_upscale or is_auto_upscale:
+                default_params.update({
+                    'upscale_denoise': getattr(async_task, 'comfy_upscale_denoise', 0.25),
+                    'upscale_by': getattr(async_task, 'comfy_upscale_factor', 2.0),
+                    'is_comfy_upscale': is_canvas_upscale,
+                    'is_auto_upscale': is_auto_upscale
+                })
+
             default_params.update(async_task.params_backend)
-            if async_task.layer_input_image is None:
-                input_images = None
-            else:
+            # Route input image: check comfy_upscale_image first, then layer_input_image (IC-Light)
+            if getattr(async_task, 'is_comfy_upscale', False) and async_task.comfy_upscale_image is not None:
+                input_images = [HWC3(async_task.comfy_upscale_image)]
+            elif async_task.layer_input_image is not None:
                 input_images = [HWC3(async_task.layer_input_image)]
+            else:
+                input_images = None
             try:
                 options = async_task.params_backend.get('ui_options', {})
                 comfy_task = get_comfy_task(async_task.task_name, async_task.task_method,
                         default_params, input_images, options)
+                # Safety Net: Ensure comfy_task
+                # never drops the upload payload
+                if comfy_task.images is None and input_images is not None and len(input_images) > 0:
+                    comfy_task.images = {'input_image': input_images[0]}
+
                 imgs = comfypipeline.process_flow(comfy_task.name, comfy_task.params, comfy_task.images, callback=callback)
+
+                # Apply Fast Auto-Upscale to generated images
+                if getattr(async_task, 'is_comfy_auto_upscale', False) and getattr(async_task, 'comfy_fast_upscale', False):
+                    progressbar(async_task, current_progress, 'Applying Fast Auto-Upscale...')
+                    imgs = [execute_fast_upscale(x, async_task.comfy_upscale_factor) for x in imgs]
+
                 # Thread-safe metadata sync:
                 # Read the task's private params
                 actual_vae = comfy_task.params.params.get('vae_name')
@@ -614,6 +799,7 @@ def worker():
             progressbar(async_task, current_progress, 'Checking for NSFW content...')
             imgs = default_censor(imgs)
         progressbar(async_task, current_progress, interpret(f'Saving image {current_task_id + 1}/{total_count} to system...', '', True))
+
         img_paths, grid_metadata = save_and_log(async_task, height, imgs, task, use_expansion, width, loras, persist_image)
         yield_result(async_task, img_paths, current_progress, async_task.black_out_nsfw, False,
             do_not_show_finished_images=not show_intermediate_results)
@@ -752,6 +938,10 @@ def worker():
         individual_image_type = build_image_type(
             async_task, base_type, update_global=False)
 
+        clean_positive = build_clean_positive_parts(task, use_expansion)
+        log_task = task.copy()
+        log_task['positive'] = clean_positive
+
         for x in imgs:
             d = [('Prompt', 'prompt', task['log_positive_prompt']),
                  ('Negative Prompt', 'negative_prompt', task['log_negative_prompt']),
@@ -763,13 +953,34 @@ def worker():
             if use_expansion:
                 d.append(('Substyle', 'v2_substyle', async_task.v2_substyle))
 
-            # Extend with the rest of standard parameters
+            # Determine native generative resolution
+            # vs upscaled delivery resolution
+            is_upscaled = (
+                    getattr(async_task, 'is_comfy_upscale', False) or
+                    getattr(async_task, 'is_comfy_auto_upscale', False))
+
+            base_w = getattr(async_task, 'orig_w', width)
+            base_h = getattr(async_task, 'orig_h', height)
+
+            # 1. 'Resolution' preserves the native
+            # generative dimensions for reproduction
             d.extend([
                 ('Performance', 'performance', async_task.performance_selection.value),
                 ('Steps', 'steps', async_task.steps),
-                ('Resolution', 'resolution', str((width, height))),
+                ('Resolution', 'resolution', str((base_w, base_h)))
+            ])
+
+            # 2. 'Upscaled to' documents the true
+            # pixel footprint on disk
+            if is_upscaled and len(imgs) > 0 and isinstance(imgs[0], np.ndarray):
+                actual_h, actual_w = imgs[0].shape[:2]
+                d.append(('Upscaled to', 'upscaled_to', str((actual_w, actual_h))))
+
+            # Extend with the rest of standard parameters
+            d.extend([
                 ('Seed', 'seed', str(task['task_seed'])),
-                ('Base Model', 'base_model', async_task.base_model_name)])
+                ('Base Model', 'base_model', async_task.base_model_name)
+            ])
 
             if async_task.task_class == 'Fooocus':
                 d.append(('Refiner Model', 'refiner_model', async_task.refiner_model_name))
@@ -808,9 +1019,9 @@ def worker():
             if async_task.save_metadata_to_images:
                 styles_name = task['styles'] if not use_expansion else [fooocus_expansion] + task['styles']
                 styles_definition = {k: modules.sdxl_styles.styles[k] for k in styles_name if k and k not in ['Fooocus V2', 'Fooocus Enhance', 'Fooocus Sharp', 'Fooocus Masterpiece', 'Fooocus Photograph', 'Fooocus Negative', 'Fooocus Cinematic']}
-                metadata_parser = modules.meta_parser.get_metadata_parser(async_task.metadata_scheme)
+                metadata_parser = get_metadata_parser(async_task.metadata_scheme)
                 metadata_parser.set_data(task['log_positive_prompt'],
-                    task['positive'],
+                    clean_positive,
                     task['log_negative_prompt'], task['negative'],
                     async_task.steps, async_task.base_model_name, async_task.refiner_model_name,
                     loras, async_task.vae_name, '')
@@ -856,7 +1067,7 @@ def worker():
                     grid_d.append(('Image Type', 'image_type', grid_image_type))
 
                     async_task.grid_metadata_template = grid_d
-                    async_task.grid_task_snapshot = task.copy()
+                    async_task.grid_task_snapshot = log_task.copy()
                     async_task.grid_parser = metadata_parser
 
             except Exception as grid_err:
@@ -864,8 +1075,7 @@ def worker():
 
             # This line must follow the metadata
             # block to save every image
-            img_paths.append(log(x, d, metadata_parser, async_task.output_format, task, persist_image))
-
+            img_paths.append(log(x, d, metadata_parser, async_task.output_format, log_task, persist_image))
         # We return the first_metadata we just stashed
         # (or None if not a grid)
         return img_paths, getattr(async_task, 'grid_metadata_template', None)
@@ -877,13 +1087,16 @@ def worker():
             cn_img = resize_image(HWC3(cn_img), width=width, height=height)
 
             if not async_task.skipping_cn_preprocessor:
-                cn_img = preprocessors.canny_pyramid(cn_img, async_task.canny_low_threshold,
-                                                     async_task.canny_high_threshold)
+                cn_img = preprocessors.canny_pyramid(
+                    cn_img, async_task.canny_low_threshold,
+                    async_task.canny_high_threshold)
 
             cn_img = HWC3(cn_img)
             task[0] = core.numpy_to_pytorch(cn_img)
             if async_task.debugging_cn_preprocessor:
-                yield_result(async_task, cn_img, current_progress, async_task.black_out_nsfw, do_not_show_finished_images=True)
+                yield_result(async_task, cn_img,
+                    current_progress, async_task.black_out_nsfw,
+                    do_not_show_finished_images=True)
         for task in async_task.cn_tasks[flags.cn_cpds]:
             cn_img, cn_stop, cn_weight = task
             cn_img = resize_image(HWC3(cn_img), width=width, height=height)
@@ -1638,13 +1851,14 @@ def worker():
             missing_automask_files = []
 
             # Check for GroundingDINO Swin Transformer
-            if not common.MODELS_INFO.exists_model(catalog='inpaint', model_path='groundingdino_swint_ogc.pth'):
+            dino_path = Path(common.MODELS_INFO.get_file_path_by_name('inpaint', 'groundingdino_swint_ogc.pth'))
+            if not common.MODELS_INFO.exists_model(catalog='inpaint', model_path='groundingdino_swint_ogc.pth') or not loader.is_file_complete(dino_path, 'https://huggingface.co/ShilongLiu/GroundingDINO/resolve/main/groundingdino_swint_ogc.pth'):
                 missing_automask_files.append('dino')
 
             # Check for the BERT text encoder
             llms_root = Path(getattr(common, 'path_llms', Path.cwd() / 'models' / 'llms'))
             bert_file = llms_root / 'bert-base-uncased' / 'model.safetensors'
-            if not bert_file.is_file():
+            if not loader.is_file_complete(bert_file, 'https://huggingface.co/google-bert/bert-base-uncased/resolve/main/model.safetensors'):
                 missing_automask_files.append('bert')
 
             if missing_automask_files:
@@ -1664,8 +1878,17 @@ def worker():
         if common.comfy_active:
 
             # Check if the UltraSharp
-            # upscaler is missing
-            if not common.MODELS_INFO.exists_model(catalog='upscale_models', model_path='4x-UltraSharp.pth'):
+            # upscaler is missing or incomplete
+            ultrasharp_needs_download = not common.MODELS_INFO.exists_model(catalog='upscale_models', model_path='4x-UltraSharp.pth')
+            if not ultrasharp_needs_download:
+                ultrasharp_path = common.MODELS_INFO.get_file_path_by_name('upscale_models', '4x-UltraSharp.pth')
+                if ultrasharp_path and not loader.is_file_complete(
+                    Path(ultrasharp_path),
+                    'https://huggingface.co/lokcx/4x-Ultrasharp/resolve/main/4x-UltraSharp.pth'
+                ):
+                    ultrasharp_needs_download = True
+
+            if ultrasharp_needs_download:
                 # Update the Gradio progress bar
                 down_msg = interpret('Downloading the UltraSharp upscaler...', silent=True)
                 async_task.yields.append(['preview', (1, down_msg, None)])
@@ -1686,13 +1909,16 @@ def worker():
 
             if face_analysis_active:
                 # Check if any of the core ONNX files
-                # are missing from the antelopev2 dir
+                # are missing or incomplete in the antelopev2 dir
                 insightface_root = Path(getattr(common, 'path_insightface', Path.cwd() / 'models' / 'insightface'))
                 antelope_dir = insightface_root / 'models' / 'antelopev2'
 
                 missing_antelope = False
                 for f in ['1k3d68.onnx', '2d106det.onnx', 'genderage.onnx', 'glintr100.onnx', 'scrfd_10g_bnkps.onnx']:
-                    if not (antelope_dir / f).exists():
+                    if not loader.is_file_complete(
+                        antelope_dir / f,
+                        f'https://huggingface.co/monas/InstantID/resolve/main/models/antelopev2/{f}'
+                    ):
                         missing_antelope = True
                         break
 
@@ -1718,8 +1944,17 @@ def worker():
                     break
 
             if faceid_active:
-                # Check if the companion LoRA is missing
-                if not common.MODELS_INFO.exists_model(catalog='loras', model_path='ip-adapter-faceid-plusv2_sdxl_lora.safetensors'):
+                # Check if the companion LoRA is missing or incomplete
+                faceid_needs_download = not common.MODELS_INFO.exists_model(catalog='loras', model_path='ip-adapter-faceid-plusv2_sdxl_lora.safetensors')
+                if not faceid_needs_download:
+                    faceid_path = common.MODELS_INFO.get_file_path_by_name('loras', 'ip-adapter-faceid-plusv2_sdxl_lora.safetensors')
+                    if faceid_path and not loader.is_file_complete(
+                        Path(faceid_path),
+                        'https://huggingface.co/h94/IP-Adapter-FaceID/resolve/main/ip-adapter-faceid-plusv2_sdxl_lora.safetensors'
+                    ):
+                        faceid_needs_download = True
+
+                if faceid_needs_download:
                     # Update the Gradio progress bar
                     down_msg = interpret('Downloading FaceID LoRA...', silent=True)
                     async_task.yields.append(['preview', (1, down_msg, None)])
@@ -1732,7 +1967,7 @@ def worker():
 
 
             # Scan active Image Prompt slots
-            # to see if the user is using PuLID
+            # to see if PuLID is being used
             pulid_active = False
             for slot in config.ip_slots:
                 if slot['image'] is not None and slot['type'] == 'PuLID':
@@ -1744,11 +1979,27 @@ def worker():
                 missing_pulid_files = []
 
                 # Check 1: The heavy EVA-CLIP visual encoder (3.6 GB)
-                if not common.MODELS_INFO.exists_model(catalog='clip', model_path='EVA02_CLIP_L_336_psz14_s6B.pt'):
+                eva_needs_download = not common.MODELS_INFO.exists_model(catalog='clip', model_path='EVA02_CLIP_L_336_psz14_s6B.pt')
+                if not eva_needs_download:
+                    eva_path = common.MODELS_INFO.get_file_path_by_name('clip', 'EVA02_CLIP_L_336_psz14_s6B.pt')
+                    if eva_path and not loader.is_file_complete(
+                        Path(eva_path),
+                        'https://huggingface.co/QuanSun/EVA-CLIP/resolve/main/EVA02_CLIP_L_336_psz14_s6B.pt'
+                    ):
+                        eva_needs_download = True
+                if eva_needs_download:
                     missing_pulid_files.append('eva_clip')
 
                 # Check 2: The Flux PuLID weight file (1.14 GB)
-                if not common.MODELS_INFO.exists_model(catalog='pulid', model_path='pulid_flux_v0.9.1.safetensors'):
+                pulid_needs_download = not common.MODELS_INFO.exists_model(catalog='pulid', model_path='pulid_flux_v0.9.1.safetensors')
+                if not pulid_needs_download:
+                    pulid_path = common.MODELS_INFO.get_file_path_by_name('pulid', 'pulid_flux_v0.9.1.safetensors')
+                    if pulid_path and not loader.is_file_complete(
+                        Path(pulid_path),
+                        'https://huggingface.co/guozinan/PuLID/resolve/main/pulid_flux_v0.9.1.safetensors'
+                    ):
+                        pulid_needs_download = True
+                if pulid_needs_download:
                     missing_pulid_files.append('flux_weight')
 
                 if missing_pulid_files:
@@ -1812,23 +2063,28 @@ def worker():
             async_task.vae_name = clean_vae
 
             vae_disk_path = Path(common.path_vae) / clean_vae
-            if not vae_disk_path.is_file():
-                catalog = {**flags.SDXL_VAES, **flags.SD15_VAES, **flags.FLUX_VAES}
-                download_url = None
-                for label, url in catalog.items():
-                    if flags.extract_vae_filename(label) == clean_vae:
-                        download_url = url
-                        break
+            catalog = {
+                **flags.SDXL_VAES,
+                **flags.SD15_VAES,
+                **flags.FLUX_VAES,
+                **flags.SD3_VAES,
+                **flags.KREA_VAES
+            }
+            download_url = None
+            for label, url in catalog.items():
+                if flags.extract_vae_filename(label) == clean_vae:
+                    download_url = url
+                    break
 
-                if download_url:
-                    down_msg = interpret('Downloading VAE profile...', silent=True)
-                    async_task.yields.append(['preview', (1, down_msg, None)])
-                    loader.load_file_from_url(
-                        url=download_url,
-                        model_dir=str(Path(common.path_vae)),
-                        file_name=clean_vae
-                    )
-                    common.MODELS_INFO.refresh_from_path()
+            if download_url and not loader.is_file_complete(vae_disk_path, download_url):
+                down_msg = interpret('Downloading VAE profile...', silent=True)
+                async_task.yields.append(['preview', (1, down_msg, None)])
+                loader.load_file_from_url(
+                    url=download_url,
+                    model_dir=str(Path(common.path_vae)),
+                    file_name=clean_vae
+                )
+                common.MODELS_INFO.refresh_from_path()
         # ----------------------------------------
 
         model_management.print_memory_info()
@@ -2079,6 +2335,8 @@ def worker():
 
         if async_task.task_class == 'Fooocus':
             async_task.yields.append(['preview', (current_progress, 'Moving model to GPU...', None)])
+        elif getattr(async_task, 'is_comfy_upscale', False):
+            async_task.yields.append(['preview', (current_progress, interpret('Processing Comfy Upscale Task...', '', True), None)])
         else:
             async_task.yields.append(['preview', (current_progress, f'Process {async_task.task_class} Task...', None)])
 
@@ -2099,9 +2357,15 @@ def worker():
             if step == 1:
                 async_task.callback_steps = 1
             async_task.callback_steps += (100 - preparation_steps) / float(all_steps)
+
+            if getattr(async_task, 'is_comfy_upscale', False):
+                step_msg = interpret(f'Upscaling step {step}/{total_steps}, image {current_task_id + 1}/{total_count}...', '', True)
+            else:
+                step_msg = interpret(f'Sampling step {step + 1}/{total_steps}, image {current_task_id + 1}/{total_count}...', '', True)
+
             async_task.yields.append(['preview', (
                 int(current_progress + async_task.callback_steps),
-                interpret(f'Sampling step {step + 1}/{total_steps}, image {current_task_id + 1}/{total_count}...','',True), y)])
+                step_msg, y)])
 
         def callback_hydittask(pipe, step, time_steps, callback_kwargs):
             from enhanced.latent_preview import get_previewer
@@ -2141,7 +2405,12 @@ def worker():
 
         for current_task_id, task in enumerate(tasks):
             print()
-            progressbar(async_task, current_progress, interpret(f'Preparing {async_task.task_class} task {current_task_id + 1}/{async_task.image_quantity}...'))
+            if getattr(async_task, 'is_comfy_upscale', False):
+                status_text = f'Comfy Upscale {current_task_id + 1}/{async_task.image_quantity}...'
+            else:
+                status_text = f'Preparing {async_task.task_class} task {current_task_id + 1}/{async_task.image_quantity}...'
+
+            progressbar(async_task, current_progress, interpret(status_text))
             execution_start_time = time.perf_counter()
 
             try:
