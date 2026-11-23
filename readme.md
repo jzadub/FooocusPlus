@@ -22,15 +22,17 @@ FooocusPlus is a community-developed AI image generation program that makes crea
 
 FooocusPlus gives you access to a diversity of AI image generation base models, including:
 
-- Stable Diffusion XL (SDXL) and a large number of SDXL variants
-- Pony Diffusion XL
 - Flux from Black Forest Labs
 - Hunyuan-DiT
+- Krea 2
 - Kwai Kolors
 - Playground 2.5
 - Segmind-Vega (coming soon)
 - Stable Diffusion 1.5 (SD1.5)
-- Stable Diffusion 3.5 Large & Medium
+- Stable Diffusion XL (SDXL) & Pony compatible models in Fooocus mode
+- SDXL & Pony compatible models in Comfy mode
+- SDXL_GGUF Custom Models
+- Stable Diffusion 3.5 (SD3.5) Large & Medium
 - Z-Image Base & Turbo
 
 If you’re new to AI art, don’t worry! Our built-in presets will give you one-click access to all of those exciting AI image generation models without any prior knowledge required. Favorite presets are located in a bar at the top of the FooocusPlus main canvas, and the whole preset collection is available from two dropdown menus located under the Settings tab. You'll be able to choose your own favorite model in no time. Favorites can be added or removed using the Favorite Preset Control accordion located right below the Extras tab.
@@ -43,7 +45,7 @@ To run FooocusPlus, you will need a computer with a graphics card capable of run
 - 16GB of system RAM (32GB recommended for SDXL, 48GB for Flux)
 - 50GB of hard drive space
 
-While some graphics cards with 4GB of video RAM (VRAM) will work - some of them even supporting Flux - image generation may be slow or erratic. Some 4GB VRAM cards may not support image generation at all.
+While some graphics cards with 4GB of video RAM (VRAM) will work - some of them even supporting large models like Flux - image generation may be slow or erratic. Some 4GB VRAM cards may not support image generation at all.
 
 For those systems with less than 7GB of VRAM, we include several presets that are optimized to work with limited VRAM. In addition, FooocusPlus supports Stable Diffusion 1.5 (SD1.5), which should run in most low VRAM cards.
 
@@ -51,7 +53,7 @@ FooocusPlus supports NVIDIA graphics cards on Windows and Linux, macOS on Silico
 
 Torchruntime is integrated into FooocusPlus. Please check their [compatibility tables](https://github.com/easydiffusion/torchruntime/blob/main/README.md#compatibility-table) for more details on hardware and software support. But unlike Torchruntime, FooocusPlus does support NVIDIA Blackwell 50xx graphics cards in full native mode with fine tuning parameters and local PyTorch attention.
 
-The Comfy generative system is integrated into FooocusPlus to provide support for non-SDXL models. Comfy no longer supports legacy video cards that require PyTorch 2.4 or earlier software. Due to this incompatibility, Comfy mode is disabled for this legacy hardware. However legacy video cards with at least 11 GB of video RAM (VRAM) do support Comfy using Forced Compatibility Mode.
+The Comfy generative system is integrated into FooocusPlus to provide additional support for generative models, including large models such as Flux, Krea 2 and Z-Image. Comfy is no longer compatible with legacy video cards that require PyTorch 2.4 or earlier software. Due to this incompatibility, Comfy mode is disabled for this legacy hardware. However legacy video cards with at least 11 GB of video RAM (VRAM) do support Comfy using Forced Compatibility Mode.
 
 ## Installing FooocusPlus
 

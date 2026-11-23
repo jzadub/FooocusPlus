@@ -784,7 +784,9 @@ div:has(> #positive_prompt) {
 #finished_images_catalog {
     margin-left: -282px !important;
 }
-#program_name {
+
+#program_name,
+#program_name_static {
     font-family: "Times New Roman", Times, serif !important;
     font-size: 130% !important;
     font-style: oblique !important;
@@ -792,10 +794,17 @@ div:has(> #positive_prompt) {
     margin-top: -17px !important;
     margin-left: 12px !important;
     max-width: 270px;
-    opacity: 0; /* Initially hidden */
-    animation: fadeInOut 60s ease-in-out 0s; /* Apply the animation */
     text-shadow: 1px 1px grey !important;
 }
+#program_name {
+    opacity: 0; /* Initially hidden */
+    animation: fadeInOut 60s ease-in-out 0s; /* Apply the animation */
+}
+#program_name_static {
+    opacity: 1; /* Always visible when toggled on */
+    z-index: 100;
+}
+
 @keyframes fadeInOut {
     0% {
     opacity: 0; /* Start completely transparent */

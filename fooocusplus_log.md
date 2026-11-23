@@ -83,7 +83,8 @@
 * Prevented Fooocus V2 style prompt duplication
 * Moved comfy_task.py from enhanced to backend_base
 * Release Date: November 21st, 2026<br/>
-* Hotfix0:
+* Hotfix1: Removed error from Pinokio'a Mac startup
+  * Added a "Show Version Info" Debug option
 <br/><br/>
 
 

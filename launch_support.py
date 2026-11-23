@@ -1,7 +1,8 @@
 import ctypes
-import subprocess
 import platform
+import re
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 from packaging.version import parse as parse_version
@@ -44,7 +45,9 @@ def define_comfy_lockout(torch_ver_str, new_driver, driver_msg, total_vram_gb):
         print('This software library is optimal for legacy hardware.')
     else:
         common.torch_status = 'New'
-        if new_driver:
+        if sys.platform == 'darwin':
+            print('Apple macOS hardware detected.')
+        elif new_driver:
             print(f'Updated NVIDIA driver detected: {driver_msg}')
         else:
             print(f'This system does not use NVIDIA hardware or the NVIDIA driver has not been updated: {driver_msg}')
@@ -58,6 +61,9 @@ def get_nvidia_driver_compatibility():
     Returns:
         tuple (bool, str): (is_compatible, status_description)
     """
+    if sys.platform == 'darwin':
+        return False, 'Apple macOS hardware detected'
+
     # 1. Query the driver's maximum supported
     # CUDA API version via ctypes
     try:
@@ -68,19 +74,22 @@ def get_nvidia_driver_compatibility():
                 if cuda_version.value >= 13000:
                     major = cuda_version.value // 1000
                     minor = (cuda_version.value % 1000) // 10
-                    return True, f"CUDA {major}.{minor} supported (Driver API value: {cuda_version.value})"
+                    return True, f'CUDA {major}.{minor} supported (Driver API value: {cuda_version.value})'
         elif sys.platform == 'linux':
             cuda_lib = ctypes.CDLL('libcuda.so')
             if cuda_lib.cuDriverGetVersion(ctypes.byref(cuda_version)) == 0:
                 if cuda_version.value >= 13000:
                     major = cuda_version.value // 1000
                     minor = (cuda_version.value % 1000) // 10
-                    return True, f"CUDA {major}.{minor} supported (Driver API value: {cuda_version.value})"
+                    return True, f'CUDA {major}.{minor} supported (Driver API value: {cuda_version.value})'
     except Exception:
         pass
 
     # 2. Fallback: Parse the raw driver
     # version string from nvidia-smi
+    if shutil.which('nvidia-smi') is None:
+        return False, 'NVIDIA driver or nvidia-smi not detected'
+
     try:
         res = subprocess.run(
             ['nvidia-smi', '--query-gpu=driver_version', '--format=csv,noheader,nounits'],
@@ -91,13 +100,13 @@ def get_nvidia_driver_compatibility():
         driver_str = res.stdout.strip()
         if driver_str:
             if parse_version(driver_str) >= parse_version('580.65'):
-                return True, f"Driver version {driver_str} >= 580.65"
+                return True, f'Driver version {driver_str} >= 580.65'
             else:
-                return False, f"Driver version {driver_str} < 580.65"
+                return False, f'Driver version {driver_str} < 580.65'
     except Exception as e:
-        return False, f"NVIDIA driver or nvidia-smi not detected: {e}"
+        return False, f'NVIDIA driver or nvidia-smi not detected: {e}'
 
-    return False, "The NVIDIA graphics card and/or driver status is unknown"
+    return False, 'The NVIDIA graphics card and/or driver status is unknown'
 
 
 def get_system_vram_gb():
@@ -201,10 +210,6 @@ def dependency_resolver():
     - bitsandbytes_default: str
     - torch_platform_ver: str
     """
-    import torchruntime
-    from torchruntime.device_db import get_gpus
-    from torchruntime.platform_detection import get_torch_platform, get_nvidia_arch
-
     global arch_version, gpu_infos
 
     # Check for video driver compatibility
@@ -236,6 +241,10 @@ def dependency_resolver():
             torch_platform_ver='none'
         )
 
+    import torchruntime
+    from torchruntime.device_db import get_gpus
+    from torchruntime.platform_detection import get_torch_platform, get_nvidia_arch
+
     # set our defaults for 2.7.1
     torch_default = '2.7.1'
     torchvision_default = '0.22.1'
@@ -258,12 +267,11 @@ def dependency_resolver():
     # First, take care of special cases
     # Note, torchruntime.torchruntime.platform_detection.py
     # suggests "directml" should be used for Intel
-    #
-    if platform.machine == 'amd64' or torchruntime_platform == 'xpu' \
-        or args.gpu_type == 'directml' \
-        or args.gpu_type == 'amd64':
+    if (args.gpu_type == 'auto' and torchruntime_platform in ['xpu', 'directml']) \
+        or args.gpu_type in ['directml', 'amd64']:
         if not args.directml:
-            args.directml = -1 # trigger a GPU ID auto-detect
+            # trigger a GPU ID auto-detect:
+            args.directml = -1
         torch_ver = '2.3.1'
 
     # --gpu-type command line overrides:

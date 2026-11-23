@@ -185,8 +185,14 @@ with common.GRADIO_ROOT:
                     # show FooocusPlus title string on main canvas
                     # the title fades in, is visible for <1 min, then fades out
                     prog_name = gr.Markdown(value=f'&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;FooocusPlus {fooocusplus_ver}.{hotfix_title}',
-                        container=False, visible=True,
+                        container=False,
+                        visible=True,
                         elem_id='program_name')
+
+                    prog_name_static = gr.Markdown(value=f'&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;FooocusPlus {fooocusplus_ver}.{hotfix_title}',
+                        container=False,
+                        visible=False,
+                        elem_id = 'program_name_static')
 
                     if config.audio_notification and US.exists_file('notification.mp3'):
                         value_audio = 'notification.mp3'
@@ -2183,6 +2189,11 @@ with common.GRADIO_ROOT:
                                 label='Revert CFG & Step to Fooocus Standards',
                                 value=False,
                                 info='Disable adaptive Guidance Scale & Override Sampling Step slider control when changing presets')
+
+                            show_version_checkbox = gr.Checkbox(
+                                label='Show Version Info',
+                                value=False,
+                                info='Keep the FooocusPlus version string visible below the main canvas')
 
                             with gr.Row(
                                 # if not Pinokio:
@@ -5864,14 +5875,26 @@ with common.GRADIO_ROOT:
         arg_revert_fooocus):
         PR.revert_fooocus = arg_revert_fooocus
         return gr.update(
-            value=PR.revert_fooocus)
-
+            value=PR.revert_fooocus
+        )
     revert_fooocus_checkbox.change(
         fn=revert_fooocus_checkbox_change,
         inputs=revert_fooocus_checkbox,
         outputs=revert_fooocus_checkbox,
-        show_progress=False, queue=False)
+        show_progress=False, queue=False
+    )
 
+    def show_version_checkbox_change(arg_show_version):
+        return (
+            gr.update(visible=not arg_show_version),
+            gr.update(visible=arg_show_version)
+        )
+    show_version_checkbox.change(
+        fn=show_version_checkbox_change,
+        inputs=show_version_checkbox,
+        outputs=[prog_name, prog_name_static],
+        show_progress=False, queue=False
+    )
 
     # Remove Torch Components Handlers
 
