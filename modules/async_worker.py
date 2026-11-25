@@ -1689,7 +1689,7 @@ def worker():
             if len(async_task.cn_tasks[flags.cn_ip_face]) > 0:
                 clip_vision_path, ip_negative_path, ip_adapter_face_path = loader.download_ip_adapters(
                     'face')
-        if async_task.enhance_input_image is not None and (async_task.current_tab == 'enhance' or (async_task.enhance_checkbox and not goals)):
+        if async_task.current_tab == 'enhance' and async_task.enhance_input_image is not None:
             goals.append('enhance')
             skip_prompt_processing = True
             async_task.enhance_input_image = HWC3(async_task.enhance_input_image)
@@ -2212,11 +2212,6 @@ def worker():
                 async_task, base_model_additional_loras, clip_vision_path, controlnet_canny_path, controlnet_cpds_path,
                 goals, inpaint_head_model_path, inpaint_image, inpaint_mask, inpaint_parameterized, ip_adapter_face_path,
                 ip_adapter_path, ip_negative_path, skip_prompt_processing, use_synthetic_refiner)
-        elif async_task.enhance_checkbox and async_task.enhance_input_image is not None:
-            # Enhance has its own panel: enhance the uploaded image even when Input Image is off
-            goals.append('enhance')
-            skip_prompt_processing = True
-            async_task.enhance_input_image = HWC3(async_task.enhance_input_image)
 
         # Load or unload CNs
         print()
