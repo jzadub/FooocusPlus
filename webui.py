@@ -3948,7 +3948,7 @@ with common.GRADIO_ROOT:
 
     def enhance_checkbox_change(arg_enhance_chk):
         config.default_enhance_checkbox = arg_enhance_chk
-        return gr.update(
+        return gr.update(value=
             config.default_enhance_checkbox)
 
     enhance_checkbox.change(

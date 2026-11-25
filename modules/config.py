@@ -195,7 +195,8 @@ init_modelsinfo(path_models_root, dict(
     inpaint=paths_inpaint,
     llms=paths_llms,
     unet=[path_unet],
-    vae=[path_vae]
+    vae=[path_vae],
+    upscale_models=[path_upscale_models]
     ))
 
 US.create_model_structure(paths_checkpoints, paths_loras)
