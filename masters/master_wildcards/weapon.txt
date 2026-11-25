@@ -1,0 +1,40 @@
+longsword
+katana
+rapier
+broadsword
+scimitar
+battle axe
+war hammer
+mace
+spear
+halberd
+longbow
+crossbow
+throwing knives
+dagger
+twin daggers
+magic staff
+enchanted wand
+glowing runic sword
+flaming sword
+ice blade
+trident
+scythe
+whip
+chakram
+shuriken
+shield
+tower shield
+round Viking shield
+kite shield
+buckler
+laser rifle
+plasma pistol
+energy sword
+railgun
+futuristic blaster
+steampunk revolver
+flintlock pistol
+musket
+blunderbuss
+harpoon

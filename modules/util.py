@@ -603,7 +603,7 @@ def apply_wildcards(wildcard_text, rng, i, read_wildcards_in_order) -> str:
                     wildcard_text = wildcard_text.replace(f'__{placeholder}__', rng.choice(words), 1)
             except:
                 interpret('[Utility] Wildcard Warning, missing or empty', f'{placeholder}.txt')
-                interpet(f'Using the wildcard as a normal word')
+                interpret('Using the wildcard as a normal word')
                 wildcard_text = wildcard_text.replace(f'__{placeholder}__', placeholder)
             interpret('[Utility] Wildcard text:', wildcard_text)
 

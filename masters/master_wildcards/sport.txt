@@ -1,0 +1,40 @@
+soccer
+basketball
+tennis
+volleyball
+baseball
+surfing
+skateboarding
+snowboarding
+skiing
+rock climbing
+boxing
+kickboxing
+karate
+judo
+fencing
+swimming
+diving
+water polo
+rowing
+sailing
+cycling
+mountain biking
+running a marathon
+sprinting
+parkour
+gymnastics
+figure skating
+ballet
+pole vault
+archery
+golf
+horse riding
+polo
+rugby
+ice hockey
+yoga
+pilates
+weightlifting
+CrossFit
+motocross

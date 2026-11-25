@@ -1,6 +1,7 @@
 # based on https://github.com/AUTOMATIC1111/stable-diffusion-webui/blob/v1.6.0/modules/ui_gradio_extensions.py
 
 import os
+import json
 import gradio as gr
 import args_manager
 import modules.config
@@ -23,6 +24,21 @@ def webpath(fn):
     return f'file={web_path}?{os.path.getmtime(fn)}'
 
 
+def style_info_json():
+    # style definitions for the style hover tooltips (javascript/style_tooltips.js)
+    try:
+        from modules.sdxl_styles import styles, fooocus_expansion, random_style_name
+        info = {name: {'p': p, 'n': n} for name, (p, n) in styles.items()}
+        info[fooocus_expansion] = {'d': 'Expands your prompt with extra descriptive words '
+            'using the built-in GPT-2 prompt expander. The added words change with the seed; '
+            'the Fooocus V2 Substyle setting changes their flavour.'}
+        info[random_style_name] = {'d': 'Picks one random style for each image and applies it.'}
+        return json.dumps(info, ensure_ascii=False).replace('</', '<\\/')
+    except Exception as e:
+        print(f'[Style Tooltips] Could not load style info: {e}')
+        return '{}'
+
+
 def javascript_html():
     script_js_path = webpath('javascript/script.js')
     context_menus_js_path = webpath('javascript/contextMenus.js')
@@ -32,6 +48,7 @@ def javascript_html():
     viewer_js_path = webpath('javascript/viewer.js')
     image_viewer_js_path = webpath('javascript/imageviewer.js')
     topbar_js_path = webpath('javascript/topbar.js')
+    style_tooltips_js_path = webpath('javascript/style_tooltips.js')
     samples_path = webpath(os.path.abspath('./sdxl_styles/samples/fooocus_v2.jpg'))
 #    preset_samples_path = webpath(os.path.abspath('./presets/samples/default.jpg'))
     head = f'<script type="text/javascript">{localization_js(args_manager.args.language)}</script>\n'
@@ -43,6 +60,8 @@ def javascript_html():
     head += f'<script type="text/javascript" src="{viewer_js_path}"></script>\n'
     head += f'<script type="text/javascript" src="{image_viewer_js_path}"></script>\n'
     head += f'<script type="text/javascript" src="{topbar_js_path}"></script>\n'
+    head += f'<script type="text/javascript">window.fooocusStyleInfo = {style_info_json()};</script>\n'
+    head += f'<script type="text/javascript" src="{style_tooltips_js_path}"></script>\n'
     head += f'<meta name="samples-path" content="{samples_path}">\n'
 #    head += f'<meta name="preset-samples-path" content="{preset_samples_path}">\n'
 

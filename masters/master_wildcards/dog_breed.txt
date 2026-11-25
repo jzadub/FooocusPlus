@@ -1,0 +1,40 @@
+golden retriever
+Labrador retriever
+German shepherd
+Siberian husky
+border collie
+corgi
+French bulldog
+English bulldog
+pug
+beagle
+dachshund
+poodle
+shih tzu
+Pomeranian
+chihuahua
+Great Dane
+Saint Bernard
+Bernese mountain dog
+Newfoundland
+mastiff
+Doberman
+Rottweiler
+boxer
+pit bull
+Dalmatian
+Shiba Inu
+Akita
+Samoyed
+Alaskan malamute
+chow chow
+greyhound
+whippet
+Afghan hound
+borzoi
+Irish wolfhound
+Jack Russell terrier
+Scottish terrier
+Yorkshire terrier
+cocker spaniel
+Cavalier King Charles spaniel

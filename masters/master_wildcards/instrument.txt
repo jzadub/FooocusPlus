@@ -1,0 +1,35 @@
+acoustic guitar
+electric guitar
+bass guitar
+piano
+grand piano
+violin
+cello
+double bass
+harp
+viola
+saxophone
+trumpet
+trombone
+clarinet
+flute
+drums
+drum kit
+djembe
+taiko drum
+tambourine
+accordion
+harmonica
+banjo
+ukulele
+mandolin
+sitar
+koto
+erhu
+bagpipes
+didgeridoo
+synthesizer
+DJ turntables
+theremin
+organ
+vintage microphone

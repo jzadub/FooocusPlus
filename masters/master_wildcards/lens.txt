@@ -1,0 +1,50 @@
+35mm lens
+50mm lens
+85mm portrait lens
+135mm telephoto lens
+24mm wide-angle lens
+14mm ultra-wide lens
+fisheye lens
+macro lens
+tilt-shift lens
+anamorphic lens
+f/1.2 shallow depth of field
+f/1.8 creamy bokeh
+f/8 sharp focus
+f/16 deep focus
+long exposure
+motion blur
+panning shot
+bokeh background
+swirly bokeh
+double exposure
+shot on 35mm film
+shot on medium format
+shot on Polaroid
+shot on a disposable camera
+Kodak Portra film look
+Fujifilm film simulation
+Ilford black and white film
+Cinestill 800T film
+expired film
+film grain
+DSLR photo
+mirrorless camera photo
+iPhone photo
+CCTV footage
+VHS tape still
+8mm film still
+16mm film still
+IMAX cinematic frame
+infrared photography
+thermal camera image
+lens flare
+chromatic aberration
+vignette
+soft focus
+halation glow
+high shutter speed freeze motion
+light trails
+star trails
+HDR photo
+low light grainy photo

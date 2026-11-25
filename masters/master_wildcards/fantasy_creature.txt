@@ -1,0 +1,75 @@
+dragon
+baby dragon
+ice dragon
+fire-breathing dragon
+sea serpent
+phoenix
+griffin
+pegasus
+unicorn
+hippogriff
+fairy
+pixie
+elf
+dark elf
+dwarf
+gnome
+goblin
+orc
+troll
+ogre
+centaur
+minotaur
+satyr
+faun
+harpy
+mermaid
+merman
+siren
+kraken
+leviathan
+werewolf
+vampire
+ghost
+banshee
+wraith
+golem
+stone gargoyle
+living tree ent
+dryad
+nymph
+kitsune nine-tailed fox
+tengu
+oni
+kappa
+qilin
+chimera
+manticore
+basilisk
+hydra
+cerberus
+wyvern
+djinn
+ifrit
+sphinx
+thunderbird
+fire elemental
+water elemental
+earth elemental
+air elemental
+shadow creature
+mimic chest
+slime monster
+beholder-like floating eye
+mushroom folk
+treant
+celestial angel
+fallen angel
+demon
+succubus
+imp
+yeti
+sasquatch
+wendigo
+chupacabra
+jackalope

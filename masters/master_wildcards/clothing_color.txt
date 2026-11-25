@@ -1,0 +1,50 @@
+black
+white
+ivory
+cream
+beige
+camel
+chocolate brown
+tan
+olive green
+khaki
+navy blue
+royal blue
+cobalt blue
+sky blue
+baby blue
+emerald green
+forest green
+sage green
+mint green
+teal
+red
+crimson
+scarlet
+burgundy
+wine red
+pink
+blush pink
+hot pink
+fuchsia
+dusty rose
+purple
+lavender
+lilac
+plum
+violet
+yellow
+mustard yellow
+lemon yellow
+gold
+orange
+coral
+peach
+terracotta
+rust
+copper
+silver
+gunmetal grey
+charcoal grey
+light grey
+metallic gold

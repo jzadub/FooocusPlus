@@ -24,6 +24,7 @@ import modules.flags as flags
 import modules.gradio_hijack as grh
 import modules.html
 import modules.loader as loader
+import modules.lora_triggers as lora_triggers
 import modules.meta_parser as meta_parser
 import modules.preset_resource as PR
 import modules.style_sorter as style_sorter
@@ -1930,6 +1931,7 @@ with common.GRADIO_ROOT:
                     return handler
 
                 lora_ctrls = []
+                lora_trigger_boxes = []
                 for i, (enabled, filename, weight) in enumerate(config.default_loras):
                     with gr.Group():
                         with gr.Row():
@@ -1954,9 +1956,17 @@ with common.GRADIO_ROOT:
 
                         lora_ctrls += [lora_enabled, lora_model, lora_weight]
 
-#                        with gr.Row():
-#                            trigger_info = gr.Markdown(value=f' Trigger Words: unknown',
-#                            container=False, visible=True)
+                        # trigger words for the selected LoRA (read-only, with copy button)
+                        trig_value, trig_label, trig_visible = lora_triggers.initial_value(filename)
+                        with gr.Row():
+                            lora_trigger = gr.Textbox(label=trig_label,
+                                value=trig_value, visible=trig_visible,
+                                interactive=False, lines=1, max_lines=4,
+                                show_copy_button=True)
+                        lora_model.change(fn=lora_triggers.trigger_box_update,
+                            inputs=lora_model, outputs=lora_trigger,
+                            queue=False, show_progress=False)
+                        lora_trigger_boxes.append(lora_trigger)
 
                 with gr.Row():
                     refresh_files = gr.Button(

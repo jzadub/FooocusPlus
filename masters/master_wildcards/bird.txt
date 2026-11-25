@@ -1,0 +1,35 @@
+peacock
+flamingo
+parrot
+macaw
+toucan
+owl
+snowy owl
+barn owl
+eagle
+bald eagle
+hawk
+falcon
+raven
+crow
+magpie
+swan
+black swan
+heron
+crane
+pelican
+hummingbird
+kingfisher
+robin
+bluebird
+cardinal
+penguin
+puffin
+albatross
+seagull
+ostrich
+cockatoo
+lovebirds
+canary
+finch
+sparrow
